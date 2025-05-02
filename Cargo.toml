@@ -1,0 +1,8 @@
+[package]
+name = "media-file-analyzer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+exiftool = "0.2.3"
+meteostat = "0.4.2"
