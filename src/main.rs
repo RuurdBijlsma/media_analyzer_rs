@@ -1,7 +1,7 @@
 use exiftool::ExifTool;
-use media_file_analyzer::gps::get_gps_info;
-use media_file_analyzer::time::get_time_info;
-use media_file_analyzer::weather::get_weather_info;
+use media_analyzer::gps::get_gps_info;
+use media_analyzer::time::get_time_info;
+use media_analyzer::weather::get_weather_info;
 use meteostat::Meteostat;
 use std::error::Error;
 use std::path::Path;

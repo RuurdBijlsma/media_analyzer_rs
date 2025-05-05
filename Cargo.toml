@@ -1,5 +1,5 @@
 [package]
-name = "media-file-analyzer"
+name = "media_analyzer"
 version = "0.1.0"
 edition = "2024"
 
