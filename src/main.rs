@@ -1,9 +1,10 @@
-use chrono::{DateTime, NaiveDate, Utc};
 use exiftool::ExifTool;
-use meteostat::{LatLon, Meteostat};
+use media_file_analyzer::gps::get_gps_info;
+use media_file_analyzer::time::get_time_info;
+use media_file_analyzer::weather::get_weather_info;
+use meteostat::Meteostat;
 use std::error::Error;
 use std::path::Path;
-use meteostat::RequiredData::SpecificDate;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -17,30 +18,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let exif_info = et.json(&path, &["-g2"])?;
         let numeric_exif = et.json(&path, &["-n"])?;
 
-        let latitude = numeric_exif.get("GPSLatitude");
-        let longitude = numeric_exif.get("GPSLongitude");
-        let altitude = numeric_exif.get("GPSAltitude");
+        dbg!(&exif_info);
 
-        let img_time = numeric_exif.get("GPSDateTime");
+        let gps_info = get_gps_info(&numeric_exif).await;
 
-        if let (Some(latitude), Some(longitude), Some(datetime)) = (
-            latitude.and_then(|x| x.as_f64()),
-            longitude.and_then(|x| x.as_f64()),
-            img_time.and_then(|x| x.as_str()),
-        ) {
-            let datetime_fixed = datetime.replace('Z', "+00:00");
-            let dt = DateTime::parse_from_str(&datetime_fixed, "%Y:%m:%d %H:%M:%S%:z")?;
-            let dt_utc: DateTime<Utc> = dt.with_timezone(&Utc);
-            dbg!(&latitude, &longitude, &dt_utc);
-            let weather_info = meteostat
-                .hourly()
-                .location(LatLon(latitude, longitude))
-                .required_data(SpecificDate(dt.date_naive()))
-                .call()
-                .await?
-                .get_at(dt_utc)?
-                .collect_hourly();
-            dbg!(&weather_info);
+        let time_info = get_time_info(&exif_info, gps_info.as_ref());
+
+        if let Some(time_info) = time_info {
+            dbg!(&time_info);
+            if let Some(gps_info) = gps_info {
+                let weather_info =
+                    get_weather_info(&meteostat, gps_info, time_info.datetime_utc.unwrap()).await;
+                dbg!(&weather_info);
+            }
         }
     }
 
