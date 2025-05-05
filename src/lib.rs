@@ -1,4 +1,4 @@
 pub mod gps;
-pub mod time;
-pub mod types;
 pub mod weather;
+pub mod time;
+pub mod utils;
