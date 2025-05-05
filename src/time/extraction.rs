@@ -49,9 +49,9 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
         }
 
         if primary_naive_candidate.is_some()
-            && !found_subsecond_number_source
-            .as_ref()
-            .is_some_and(|(src, _)| src == "_ParsedFromString_")
+            && found_subsecond_number_source
+                .as_ref()
+                .is_none_or(|(src, _)| src != "_ParsedFromString_")
         {
             let base_field_name = field.replace("SubSec", "");
             let sub_sec_num_field = format!(
@@ -68,9 +68,11 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
                 }
             }
 
-            let simpler_sub_sec_field = format!("SubSecond{}", base_field_name.replace("DateTime", ""));
+            let simpler_sub_sec_field =
+                format!("SubSecond{}", base_field_name.replace("DateTime", ""));
             if found_subsecond_number_source.is_none() {
-                if let Some(subsec_num) = get_number_field(exif_info, group, &simpler_sub_sec_field) {
+                if let Some(subsec_num) = get_number_field(exif_info, group, &simpler_sub_sec_field)
+                {
                     if primary_naive_candidate
                         .as_ref()
                         .is_some_and(|(_, src)| *src == base_field_name || *src == field)

@@ -46,7 +46,7 @@ fn apply_priority_logic(
     if let (
         Some((naive_dt, naive_source)), // Local naive time from camera
         Some((gps_utc_dt, utc_source)), // UTC time from GPS
-        Some(gps), // GPS coordinates
+        Some(gps),                      // GPS coordinates
     ) = (&best_naive, &potential_utc, gps_info)
     {
         // Find the IANA timezone name from GPS coordinates
@@ -55,7 +55,7 @@ fn apply_priority_logic(
             // Attempt to interpret the camera's naive time in the location's timezone.
             // Handle ambiguity (e.g., DST) by preferring the earlier time (common).
             if let LocalResult::Single(zoned_dt) | LocalResult::Ambiguous(zoned_dt, _) =
-                tz.from_local_datetime(&naive_dt)
+                tz.from_local_datetime(naive_dt)
             {
                 // Convert the interpreted local time to UTC
                 let calculated_utc_from_naive = zoned_dt.with_timezone(&Utc);
@@ -270,6 +270,6 @@ fn apply_priority_logic(
             },
         });
     }
-    
+
     None
 }

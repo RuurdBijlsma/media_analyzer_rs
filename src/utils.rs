@@ -3,7 +3,8 @@ use walkdir::{DirEntry, WalkDir};
 
 /// Checks if a directory entry is hidden (starts with '.').
 fn is_hidden(entry: &DirEntry) -> bool {
-    entry.file_name()
+    entry
+        .file_name()
         .to_str()
         .map(|s| s.starts_with('.'))
         .unwrap_or(false)
@@ -11,17 +12,22 @@ fn is_hidden(entry: &DirEntry) -> bool {
 
 /// Recursively lists all files using `walkdir` and `filter_entry`.
 /// This version propagates I/O errors encountered during traversal.
-pub fn list_files_walkdir_filtered(dir: &Path, include_hidden: bool) -> Result<Vec<PathBuf>, walkdir::Error> {
+pub fn list_files_walkdir_filtered(
+    dir: &Path,
+    include_hidden: bool,
+) -> Result<Vec<PathBuf>, walkdir::Error> {
     WalkDir::new(dir)
         .into_iter()
-        .filter_entry(|e| { // Filter entries *before* processing/descending
+        .filter_entry(|e| {
+            // Filter entries *before* processing/descending
             if include_hidden {
                 true // Always include if include_hidden is true
             } else {
                 !is_hidden(e) // Include only if not hidden
             }
         })
-        .filter_map(|entry_result| { // Process results after filtering
+        .filter_map(|entry_result| {
+            // Process results after filtering
             // Instead of entry_result.ok(), handle the Result explicitly
             match entry_result {
                 Ok(entry) => {

@@ -15,7 +15,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let meteostat = Meteostat::new().await?;
 
     let start_dir = Path::new("E:/Backup/Photos/photos/photos");
-    let all_files = list_files_walkdir_filtered(&start_dir, false)?; // Renamed to avoid confusion
+    let all_files = list_files_walkdir_filtered(start_dir, false)?; // Renamed to avoid confusion
     println!("Found {} total files.", all_files.len());
     let sample_size = 10;
     let num_to_sample = sample_size.min(all_files.len());
@@ -52,7 +52,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
 
         if let Some(time_info) = &time_info {
-            println!("{} - UTC: {:?}, NAIVE: {}", path.display(), time_info.datetime_utc, time_info.datetime_naive);
+            println!(
+                "{} - UTC: {:?}, NAIVE: {}",
+                path.display(),
+                time_info.datetime_utc,
+                time_info.datetime_naive
+            );
         } else {
             println!("{} - NO TIMEINFO", path.display());
         }

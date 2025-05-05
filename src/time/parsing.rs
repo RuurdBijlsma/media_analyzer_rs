@@ -26,8 +26,9 @@ pub fn parse_naive(s: &str) -> Option<(NaiveDateTime, bool)> {
 
 /// Parses a datetime string with a timezone offset (e.g., file modification date).
 pub fn parse_datetime_offset(s: &str) -> Option<DateTime<FixedOffset>> {
-    DateTime::parse_from_str(s, "%Y:%m:%d %H:%M:%S%z").ok()
-        .or_else(|| DateTime::parse_from_rfc3339(s).ok().map(|dt| dt.into()))
+    DateTime::parse_from_str(s, "%Y:%m:%d %H:%M:%S%z")
+        .ok()
+        .or_else(|| DateTime::parse_from_rfc3339(s).ok())
 }
 
 /// Parses a datetime string ending in 'Z' indicating UTC.
@@ -37,7 +38,9 @@ pub fn parse_datetime_utc_z(s: &str) -> Option<DateTime<chrono::Utc>> {
         .map(|dt| dt.with_timezone(&chrono::Utc))
         .or_else(|| {
             if s.ends_with('Z') {
-                DateTime::parse_from_rfc3339(s).ok().map(|dt| dt.with_timezone(&chrono::Utc))
+                DateTime::parse_from_rfc3339(s)
+                    .ok()
+                    .map(|dt| dt.with_timezone(&chrono::Utc))
             } else {
                 None
             }

@@ -1,8 +1,8 @@
+use crate::gps::GpsInfo;
 use anyhow::bail;
 use chrono::{DateTime, Utc};
 use meteostat::RequiredData::SpecificDate;
 use meteostat::{Hourly, LatLon, Meteostat, MeteostatError};
-use crate::gps::GpsInfo;
 
 pub async fn get_weather_info(
     client: &Meteostat,

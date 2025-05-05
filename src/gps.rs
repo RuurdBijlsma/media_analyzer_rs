@@ -7,7 +7,6 @@ pub struct GpsInfo {
     pub altitude: Option<f64>,
 }
 
-
 pub async fn get_gps_info(numeric_exif: &Value) -> Option<GpsInfo> {
     let (latitude, longitude) = match (
         numeric_exif.get("GPSLatitude").and_then(Value::as_f64),
