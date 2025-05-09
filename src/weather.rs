@@ -1,6 +1,6 @@
 use crate::gps::GpsInfo;
-use anyhow::bail;
 use chrono::{DateTime, Utc};
+use color_eyre::eyre::bail;
 use meteostat::RequiredData::SpecificDate;
 use meteostat::{Hourly, LatLon, Meteostat, MeteostatError};
 
@@ -8,7 +8,7 @@ pub async fn get_weather_info(
     client: &Meteostat,
     gps_info: GpsInfo,
     datetime: DateTime<Utc>,
-) -> anyhow::Result<Option<Hourly>> {
+) -> color_eyre::Result<Option<Hourly>> {
     let weather_info = client
         .hourly()
         .location(LatLon(gps_info.latitude, gps_info.longitude))

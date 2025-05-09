@@ -6,15 +6,16 @@ use media_analyzer::weather::get_weather_info;
 use meteostat::Meteostat;
 use rand::prelude::IndexedRandom;
 use rand::rng;
-use std::error::Error;
 use std::path::Path;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
+
     let mut et = ExifTool::new()?;
     let meteostat = Meteostat::new().await?;
 
-    let start_dir = Path::new("E:/Backup/Photos/photos/photos");
+    let start_dir = Path::new("E:/Backup/Photos/phdotos/photos");
     let all_files = list_files_walkdir_filtered(start_dir, false)?; // Renamed to avoid confusion
     println!("Found {} total files.", all_files.len());
     let sample_size = 10;
