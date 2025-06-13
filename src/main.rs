@@ -15,7 +15,7 @@ async fn main() -> color_eyre::Result<()> {
     let mut et = ExifTool::new()?;
     let meteostat = Meteostat::new().await?;
 
-    let start_dir = Path::new("E:/Backup/Photos/phdotos/photos");
+    let start_dir = Path::new("E:/Backup/Photos/photos/photos");
     let all_files = list_files_walkdir_filtered(start_dir, false)?; // Renamed to avoid confusion
     println!("Found {} total files.", all_files.len());
     let sample_size = 10;
@@ -41,13 +41,16 @@ async fn main() -> color_eyre::Result<()> {
         if let Some(time_info) = &time_info {
             if let Some(gps_info) = gps_info {
                 let _weather_info =
-                    get_weather_info(&meteostat, gps_info, time_info.datetime_utc.unwrap()).await?;
+                    get_weather_info(&meteostat, gps_info, time_info.datetime_utc.unwrap())
+                        .await
+                        .ok()
+                        .flatten();
                 println!(
                     "{} - UTC: {:?}, NAIVE: {}, TEMP: {:?}",
                     path.display(),
                     time_info.datetime_utc,
                     time_info.datetime_naive,
-                    _weather_info.unwrap().temperature
+                    _weather_info.and_then(|x| x.temperature),
                 );
             }
         }
