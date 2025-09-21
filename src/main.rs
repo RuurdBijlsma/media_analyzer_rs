@@ -7,6 +7,7 @@ use meteostat::Meteostat;
 use rand::prelude::IndexedRandom;
 use rand::rng;
 use std::path::Path;
+use media_analyzer::data_url::file_to_data_url;
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
@@ -18,7 +19,7 @@ async fn main() -> color_eyre::Result<()> {
     let start_dir = Path::new("E:/Backup/Photos/photos/photos");
     let all_files = list_files_walkdir_filtered(start_dir, false)?; // Renamed to avoid confusion
     println!("Found {} total files.", all_files.len());
-    let sample_size = 10;
+    let sample_size = 1;
     let num_to_sample = sample_size.min(all_files.len());
     println!("Randomly sampling {} files...", num_to_sample);
     let mut rng_machine = rng();
@@ -36,6 +37,8 @@ async fn main() -> color_eyre::Result<()> {
         let numeric_exif = et.json(&path, &["-n"])?;
         let gps_info = get_gps_info(&numeric_exif).await;
         let time_info = get_time_info(&exif_info, gps_info.as_ref());
+        let data_url = file_to_data_url(&path);
+        println!("{:?}", data_url);
 
         if let Some(time_info) = &time_info && let Some(gps_info) = &gps_info {
             let weather_info =
