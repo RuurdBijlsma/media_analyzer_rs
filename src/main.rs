@@ -28,7 +28,7 @@ async fn main() -> color_eyre::Result<()> {
 
     println!("Processing sampled files:");
 
-    // Iterate over the *sampled* files (references)
+    // Iterate over the sampled files
     for file in sampled_files_iter {
         let path = file.canonicalize()?;
 
@@ -36,31 +36,27 @@ async fn main() -> color_eyre::Result<()> {
         let numeric_exif = et.json(&path, &["-n"])?;
         let gps_info = get_gps_info(&numeric_exif).await;
         let time_info = get_time_info(&exif_info, gps_info.as_ref());
-        // dbg!(&time_info);
 
-        if let Some(time_info) = &time_info {
-            if let Some(gps_info) = gps_info {
-                let _weather_info =
-                    get_weather_info(&meteostat, gps_info, time_info.datetime_utc.unwrap())
-                        .await
-                        .ok()
-                        .flatten();
-                println!(
-                    "{} - UTC: {:?}, NAIVE: {}, TEMP: {:?}",
-                    path.display(),
-                    time_info.datetime_utc,
-                    time_info.datetime_naive,
-                    _weather_info.and_then(|x| x.temperature),
-                );
-            }
-        }
-
-        if let Some(time_info) = &time_info {
+        if let Some(time_info) = &time_info && let Some(gps_info) = &gps_info {
+            let weather_info =
+                get_weather_info(&meteostat, gps_info, time_info.datetime_utc.unwrap())
+                    .await
+                    .ok()
+                    .flatten();
+            println!(
+                "{} - UTC: {:?}, NAIVE: {}, TEMP: {:?}, GPS: {:?}",
+                path.display(),
+                time_info.datetime_utc,
+                time_info.datetime_naive,
+                weather_info.and_then(|x| x.temperature),
+                gps_info,
+            );
+        } else if let Some(time_info) = &time_info {
             println!(
                 "{} - UTC: {:?}, NAIVE: {}",
                 path.display(),
                 time_info.datetime_utc,
-                time_info.datetime_naive
+                time_info.datetime_naive,
             );
         } else {
             println!("{} - NO TIMEINFO", path.display());

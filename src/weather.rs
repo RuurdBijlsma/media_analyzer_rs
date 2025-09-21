@@ -6,7 +6,7 @@ use meteostat::{Hourly, LatLon, Meteostat, MeteostatError};
 
 pub async fn get_weather_info(
     client: &Meteostat,
-    gps_info: GpsInfo,
+    gps_info: &GpsInfo,
     datetime: DateTime<Utc>,
 ) -> color_eyre::Result<Option<Hourly>> {
     let weather_info = client
