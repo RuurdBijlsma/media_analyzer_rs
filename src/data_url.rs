@@ -4,6 +4,7 @@ use base64::{engine::general_purpose, Engine as _};
 use mime_guess::MimeGuess; // so you can guess the media type
 
 pub fn file_to_data_url<P: AsRef<Path>>(path: P) -> anyhow::Result<String> {
+    // todo make image small first?
     let path = path.as_ref();
     let data = fs::read(path)?;
     let b64 = general_purpose::STANDARD.encode(&data);
