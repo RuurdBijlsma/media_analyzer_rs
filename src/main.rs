@@ -6,8 +6,9 @@ use media_analyzer::weather::get_weather_info;
 use meteostat::Meteostat;
 use rand::prelude::IndexedRandom;
 use rand::rng;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use media_analyzer::data_url::file_to_data_url;
+use media_analyzer::tags::extract_tags;
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
@@ -32,13 +33,20 @@ async fn main() -> color_eyre::Result<()> {
     // Iterate over the sampled files
     for file in sampled_files_iter {
         let path = file.canonicalize()?;
+        // motion photo:
+        // let path = Path::new("E:/Backup/Photos/Vakantie 2026 Sardinie/PXL_20250918_121421114.MP.jpg");
+
+        // panorama
+        let path = Path::new("E:/Backup/Photos/Vakantie 2026 Sardinie/PXL_20250903_044134290.PANO.jpg");
 
         let exif_info = et.json(&path, &["-g2"])?;
+        let tags = extract_tags(&path, &exif_info);
+        println!("{:?}", &tags);
         let numeric_exif = et.json(&path, &["-n"])?;
         let gps_info = get_gps_info(&numeric_exif).await;
         let time_info = get_time_info(&exif_info, gps_info.as_ref());
-        let data_url = file_to_data_url(&path);
-        println!("{:?}", data_url);
+        let _data_url = file_to_data_url(&path);
+        // println!("{:?}", data_url);
 
         if let Some(time_info) = &time_info && let Some(gps_info) = &gps_info {
             let weather_info =

@@ -1490,6 +1490,7 @@ dependencies = [
  "chrono-tz",
  "color-eyre",
  "exiftool",
+ "lazy_static",
  "meteostat",
  "mime_guess",
  "once_cell",
