@@ -10,6 +10,8 @@ use rand::prelude::IndexedRandom;
 use rand::rng;
 use std::path::Path;
 
+// TODO: make rust package and output clean data structure
+
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
@@ -37,7 +39,8 @@ async fn main() -> color_eyre::Result<()> {
         // let path = Path::new("E:/Backup/Photos/Vakantie 2026 Sardinie/PXL_20250918_121421114.MP.jpg");
 
         // panorama
-        let path = Path::new("E:/Backup/Photos/Vakantie 2026 Sardinie/PXL_20250903_044134290.PANO.jpg");
+        let path =
+            Path::new("E:/Backup/Photos/Vakantie 2026 Sardinie/PXL_20250903_044134290.PANO.jpg");
 
         // video
         // let path = Path::new("E:/Backup/Photos/photos/photos/VID_20220723_134136.mp4");
