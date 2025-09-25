@@ -18,7 +18,7 @@ async fn main() -> color_eyre::Result<()> {
     let meteostat = Meteostat::new().await?;
 
     let start_dir = Path::new("E:/Backup/Photos/photos/photos");
-    let all_files = list_files_walkdir_filtered(start_dir, false)?; // Renamed to avoid confusion
+    let all_files = list_files_walkdir_filtered(start_dir, false)?;
     println!("Found {} total files.", all_files.len());
     let sample_size = 1;
     let num_to_sample = sample_size.min(all_files.len());
@@ -32,24 +32,25 @@ async fn main() -> color_eyre::Result<()> {
 
     // Iterate over the sampled files
     for file in sampled_files_iter {
-        let path = file.canonicalize()?;
+        let path = &file.canonicalize()?;
         // motion photo:
         // let path = Path::new("E:/Backup/Photos/Vakantie 2026 Sardinie/PXL_20250918_121421114.MP.jpg");
 
         // panorama
-        // let path = Path::new("E:/Backup/Photos/Vakantie 2026 Sardinie/PXL_20250903_044134290.PANO.jpg");
+        let path = Path::new("E:/Backup/Photos/Vakantie 2026 Sardinie/PXL_20250903_044134290.PANO.jpg");
 
         // video
         // let path = Path::new("E:/Backup/Photos/photos/photos/VID_20220723_134136.mp4");
 
         // burst
-        let path = Path::new("assets/timelapse.mp4");
+        // let path = Path::new("assets/timelapse.mp4");
 
-        opener::open(path).expect("panic message");
+        // opener::open(path).expect("panic message");
 
         let exif_info = et.json(path, &["-g2"])?;
         let numeric_exif = et.json(path, &["-n"])?;
         let tags = extract_tags(path, &numeric_exif);
+        println!("{:?}", path);
         println!("{:?}", &tags);
 
         // println!("{}", serde_json::to_string_pretty(&numeric_exif).unwrap());

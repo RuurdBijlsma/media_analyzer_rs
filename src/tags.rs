@@ -3,10 +3,24 @@ use regex::Regex;
 use serde_json::Value;
 use std::path::Path;
 
+// TODO make tags folder and extract some functions into their own file this one is too big.
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PanoInfo {
+    /// The calculated horizontal field of view in degrees.
+    pub horizontal_fov_deg: f64,
+    /// The calculated vertical field of view in degrees.
+    pub vertical_fov_deg: f64,
+    /// The horizontal center of the view in degrees (-180 to 180).
+    pub center_yaw_deg: f64,
+    /// The vertical center of the view in degrees (-90 to 90).
+    pub center_pitch_deg: f64,
+}
 /// Tags, such as is_panorama, is_motion_photo, is_night_sight.
 #[derive(Debug, PartialEq)]
 pub struct TagData {
     pub use_panorama_viewer: bool,
+    pub pano_info: Option<PanoInfo>,
     pub is_photosphere: bool,
     pub projection_type: Option<String>,
     pub is_motion_photo: bool,
@@ -22,6 +36,41 @@ pub struct TagData {
     pub video_fps: Option<f64>,
 }
 
+
+/// Parses the GPano EXIF tags to calculate the dimensions of a partial panorama.
+/// Returns None if the required tags are not present.
+fn parse_partial_pano_info(exif: &Value) -> Option<PanoInfo> {
+    // Attempt to get all six required values as f64. If any are missing, return None.
+    let full_width = exif.get("FullPanoWidthPixels")?.as_f64()?;
+    let full_height = exif.get("FullPanoHeightPixels")?.as_f64()?;
+    let cropped_width = exif.get("CroppedAreaImageWidthPixels")?.as_f64()?;
+    let cropped_height = exif.get("CroppedAreaImageHeightPixels")?.as_f64()?;
+    let cropped_left = exif.get("CroppedAreaLeftPixels")?.as_f64()?;
+    let cropped_top = exif.get("CroppedAreaTopPixels")?.as_f64()?;
+
+    // Avoid division by zero.
+    if full_width == 0.0 || full_height == 0.0 {
+        return None;
+    }
+
+    // --- Calculate Field of View ---
+    let horizontal_fov_deg = (cropped_width / full_width) * 360.0;
+    let vertical_fov_deg = (cropped_height / full_height) * 180.0;
+
+    // --- Calculate Center Point (Yaw and Pitch) ---
+    // Yaw: Horizontal center. 0 is forward, -180 is left, 180 is right.
+    let center_yaw_deg = ((cropped_left + cropped_width / 2.0) / full_width - 0.5) * 360.0;
+    // Pitch: Vertical center. 0 is horizon, 90 is up, -90 is down.
+    let center_pitch_deg = ((cropped_top + cropped_height / 2.0) / full_height - 0.5) * -180.0;
+
+    Some(PanoInfo {
+        horizontal_fov_deg,
+        vertical_fov_deg,
+        center_yaw_deg,
+        center_pitch_deg,
+    })
+}
+
 /// Layer 2 of burst detection: Detects burst photos from filename conventions (primarily Android).
 fn detect_burst_from_filename(filename_lower: &str) -> (bool, Option<String>) {
     if !filename_lower.contains("burst") {
@@ -33,14 +82,13 @@ fn detect_burst_from_filename(filename_lower: &str) -> (bool, Option<String>) {
         static ref BURST_ID_PATTERN: Regex = Regex::new(r"(?i)(.*?)_burst.*").unwrap();
     }
 
-    if let Some(caps) = BURST_ID_PATTERN.captures(filename_lower) {
-        if let Some(id) = caps.get(1) {
+    if let Some(caps) = BURST_ID_PATTERN.captures(filename_lower)
+        && let Some(id) = caps.get(1) {
             let burst_id = id.as_str();
             if !burst_id.is_empty() {
                 return (true, Some(burst_id.to_string()));
             }
         }
-    }
     (false, None)
 }
 
@@ -49,21 +97,20 @@ fn find_burst_info(exif: &Value, filename_lower: &str) -> (bool, Option<String>)
     // Layer 1: Check for explicit EXIF burst tags (most reliable method).
     // - BurstUUID is the standard for Apple devices.
     // - GCamera:BurstId is a specific XMP tag used by Google Camera.
-    let exif_burst_id = exif.get("BurstUUID")
+    let exif_burst_id = exif
+        .get("BurstUUID")
         .or_else(|| exif.get("GCamera:BurstId"))
         .or_else(|| exif.get("BurstId"))
         .and_then(|v| v.as_str().map(String::from));
 
-    if let Some(id) = exif_burst_id {
-        if !id.is_empty() {
+    if let Some(id) = exif_burst_id
+        && !id.is_empty() {
             return (true, Some(id));
         }
-    }
 
     // Layer 2: Fallback to filename-based detection for other devices (e.g., Samsung).
     detect_burst_from_filename(filename_lower)
 }
-
 
 fn detect_hdr(v: &Value) -> bool {
     // 1. Pixel: CompositeImage == 3
@@ -101,15 +148,15 @@ fn detect_hdr(v: &Value) -> bool {
     // 5. XMP / gain map detection
     if v.get("GainMapImage").is_some()
         || v.get("DirectoryItemSemantic")
-        .and_then(|x| x.as_array())
-        .map(|arr| {
-            arr.iter().any(|s| {
-                s.as_str()
-                    .map(|s| s.eq_ignore_ascii_case("GainMap"))
-                    .unwrap_or(false)
+            .and_then(|x| x.as_array())
+            .map(|arr| {
+                arr.iter().any(|s| {
+                    s.as_str()
+                        .map(|s| s.eq_ignore_ascii_case("GainMap"))
+                        .unwrap_or(false)
+                })
             })
-        })
-        .unwrap_or(false)
+            .unwrap_or(false)
     {
         return true;
     }
@@ -181,12 +228,52 @@ pub fn extract_tags(path: &Path, exif: &Value) -> TagData {
         .and_then(|v| v.as_str())
         .map(String::from);
 
-    // If a projection type exists, it requires a panorama viewer.
-    let use_panorama_viewer = projection_type.is_some() || has_pano_in_filename;
-
-    let is_photosphere = projection_type
-        .as_deref()
+    let is_equirectangular = projection_type
+        .clone()
         .is_some_and(|s| s.eq_ignore_ascii_case("equirectangular"));
+
+    // Step 2: If it's equirectangular, determine if it's a full sphere or a partial pano.
+    let pano_info: Option<PanoInfo> = if is_equirectangular {
+        // Attempt to parse the detailed GPano tags for a partial panorama.
+        if let Some(partial_info) = parse_partial_pano_info(exif) {
+            Some(partial_info)
+        } else {
+            // If the detailed tags are missing, assume it's a full 360° sphere.
+            Some(PanoInfo {
+                horizontal_fov_deg: 360.,
+                vertical_fov_deg: 180.,
+                center_yaw_deg: 0.,
+                center_pitch_deg: 0.,
+            })
+        }
+    } else {
+        // Not an equirectangular projection, so not a spherical panorama.
+        None
+    };
+
+    // If a projection type exists, it requires a panorama viewer.
+    let use_panorama_viewer = pano_info.is_some() || has_pano_in_filename;
+
+    // Step 3: Determine if the image should be treated as a full photosphere.
+    let is_photosphere = if is_equirectangular {
+        match &pano_info {
+            Some(info) => {
+                // Case A: We have explicit data. It's a photosphere only if the
+                // data describes a full 360x180 degree view.
+                let is_full_horizontal = (info.horizontal_fov_deg - 360.0).abs() < 0.1;
+                let is_full_vertical = (info.vertical_fov_deg - 180.0).abs() < 0.1;
+                is_full_horizontal && is_full_vertical
+            }
+            None => {
+                // Case B: The image is equirectangular, but the detailed GPano tags
+                // are missing. By convention, we must assume it's a full sphere.
+                true
+            }
+        }
+    } else {
+        // Case C: Not an equirectangular image, so it cannot be a photosphere.
+        false
+    };
 
     // --- Video Metadata ---
     let video_fps = exif
@@ -234,6 +321,7 @@ pub fn extract_tags(path: &Path, exif: &Value) -> TagData {
         is_night_sight,
         is_motion_photo,
         projection_type,
+        pano_info,
         use_panorama_viewer,
         motion_photo_presentation_timestamp,
     }
