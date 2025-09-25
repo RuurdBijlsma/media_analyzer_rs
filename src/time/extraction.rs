@@ -36,17 +36,15 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
     let mut found_subsecond_number_source: Option<(String, u32)> = None;
 
     for (group, field, _is_subsec_field) in naive_sources_priority {
-        if primary_naive_candidate.is_none() {
-            if let Some(dt_str) = get_string_field(exif_info, group, field) {
-                if let Some((dt, parsed_subsec)) = parse_naive(dt_str) {
+        if primary_naive_candidate.is_none()
+            && let Some(dt_str) = get_string_field(exif_info, group, field)
+                && let Some((dt, parsed_subsec)) = parse_naive(dt_str) {
                     let source_name = field.to_string();
                     primary_naive_candidate = Some((dt, source_name));
                     if parsed_subsec {
                         found_subsecond_number_source = Some(("_ParsedFromString_".to_string(), 0));
                     }
                 }
-            }
-        }
 
         if primary_naive_candidate.is_some()
             && found_subsecond_number_source
@@ -59,28 +57,24 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
                 base_field_name.replace("Date", "").replace("Time", "")
             );
 
-            if let Some(subsec_num) = get_number_field(exif_info, group, &sub_sec_num_field) {
-                if primary_naive_candidate
+            if let Some(subsec_num) = get_number_field(exif_info, group, &sub_sec_num_field)
+                && primary_naive_candidate
                     .as_ref()
                     .is_some_and(|(_, src)| *src == base_field_name || *src == field)
                 {
                     found_subsecond_number_source = Some((sub_sec_num_field, subsec_num));
                 }
-            }
 
             let simpler_sub_sec_field =
                 format!("SubSecond{}", base_field_name.replace("DateTime", ""));
-            if found_subsecond_number_source.is_none() {
-                if let Some(subsec_num) = get_number_field(exif_info, group, &simpler_sub_sec_field)
-                {
-                    if primary_naive_candidate
+            if found_subsecond_number_source.is_none()
+                && let Some(subsec_num) = get_number_field(exif_info, group, &simpler_sub_sec_field)
+                    && primary_naive_candidate
                         .as_ref()
                         .is_some_and(|(_, src)| *src == base_field_name || *src == field)
                     {
                         found_subsecond_number_source = Some((simpler_sub_sec_field, subsec_num));
                     }
-                }
-            }
         }
 
         if primary_naive_candidate.is_some() && found_subsecond_number_source.is_some() {
@@ -105,13 +99,12 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
     let best_naive = primary_naive_candidate;
 
     // --- Potential UTC Time ---
-    if let Some(gps_dt_str) = get_string_field(exif_info, "Time", "GPSDateTime") {
-        if let Some(dt_utc) = parse_datetime_utc_z(gps_dt_str) {
+    if let Some(gps_dt_str) = get_string_field(exif_info, "Time", "GPSDateTime")
+        && let Some(dt_utc) = parse_datetime_utc_z(gps_dt_str) {
             potential_utc = Some((dt_utc, "GPSDateTime".to_string()));
         }
-    }
-    if potential_utc.is_none() {
-        if let (Some(date_str), Some(time_str)) = (
+    if potential_utc.is_none()
+        && let (Some(date_str), Some(time_str)) = (
             get_string_field(exif_info, "Time", "GPSDateStamp"),
             get_string_field(exif_info, "Time", "GPSTimeStamp"),
         ) {
@@ -120,7 +113,6 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
                 potential_utc = Some((dt_utc, "GPSDateStamp/GPSTimeStamp".to_string()));
             }
         }
-    }
 
     // --- Potential Explicit Offset ---
     let offset_sources_priority = [
@@ -129,11 +121,11 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
         ("Time", "OffsetTime"),
     ];
     for (group, field) in offset_sources_priority {
-        if let Some(offset_str) = get_string_field(exif_info, group, field) {
-            if let Some((secs, parsed_str)) = parse_offset_string(offset_str) {
-                potential_explicit_offset = Some((secs, parsed_str, field.to_string()));
-                break;
-            }
+        if let Some(offset_str) = get_string_field(exif_info, group, field)
+            && let Some((secs, parsed_str)) = parse_offset_string(offset_str)
+        {
+            potential_explicit_offset = Some((secs, parsed_str, field.to_string()));
+            break;
         }
     }
 
@@ -144,11 +136,11 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
         ("Time", "FileAccessDate"),
     ];
     for (group, field) in file_time_sources_priority {
-        if let Some(dt_str) = get_string_field(exif_info, group, field) {
-            if let Some(dt) = parse_datetime_offset(dt_str) {
-                potential_file_dt = Some((dt, field.to_string()));
-                break;
-            }
+        if let Some(dt_str) = get_string_field(exif_info, group, field)
+            && let Some(dt) = parse_datetime_offset(dt_str)
+        {
+            potential_file_dt = Some((dt, field.to_string()));
+            break;
         }
     }
 

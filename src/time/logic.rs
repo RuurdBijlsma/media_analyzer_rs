@@ -1,18 +1,14 @@
 //! Core logic for determining the best time representation based on extracted components.
 
-use super::extraction::{ExtractedTimeComponents, extract_time_components, get_string_field};
+use super::extraction::{extract_time_components, get_string_field, ExtractedTimeComponents};
 use crate::gps::GpsInfo;
-use crate::time::time_types::{
-    CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, SourceDetails, TimeInfo, TimeZoneInfo,
-};
-use chrono::{
-    DateTime, FixedOffset, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc,
-};
+use crate::time::time_types::{SourceDetails, TimeInfo, TimeZoneInfo, CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM};
+use chrono::{DateTime, FixedOffset, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc};
 use chrono_tz::Tz;
 use once_cell::sync::Lazy;
-use regex::Regex;
 use serde_json::Value;
 use std::str::FromStr;
+use regex::Regex;
 use tzf_rs::DefaultFinder;
 
 // --- Constants specific to the logic ---
@@ -93,53 +89,50 @@ fn apply_priority_logic(
     if let Some((naive_dt, ref naive_source)) = best_naive {
         if let Some(gps) = gps_info {
             let tz_name = FINDER.get_tz_name(gps.longitude, gps.latitude);
-            if let Ok(tz) = Tz::from_str(tz_name) {
-                if let LocalResult::Single(zoned_dt) | LocalResult::Ambiguous(zoned_dt, _) =
+            if let Ok(tz) = Tz::from_str(tz_name)
+                && let LocalResult::Single(zoned_dt) | LocalResult::Ambiguous(zoned_dt, _) =
                     tz.from_local_datetime(&naive_dt)
-                {
-                    let utc_dt = zoned_dt.with_timezone(&Utc);
-                    let offset_secs = zoned_dt.offset().fix().local_minus_utc();
-                    return Some(TimeInfo {
-                        datetime_utc: Some(utc_dt),
-                        datetime_naive: naive_dt,
-                        timezone: Some(TimeZoneInfo {
-                            name: tz.name().to_string(),
-                            offset_seconds: offset_secs,
-                            source: "IANA from GPS".to_string(),
-                        }),
-                        source_details: SourceDetails {
-                            time_source: naive_source.clone(),
-                            confidence: CONFIDENCE_HIGH.to_string(),
-                        },
-                    });
-                }
+            {
+                let utc_dt = zoned_dt.with_timezone(&Utc);
+                let offset_secs = zoned_dt.offset().fix().local_minus_utc();
+                return Some(TimeInfo {
+                    datetime_utc: Some(utc_dt),
+                    datetime_naive: naive_dt,
+                    timezone: Some(TimeZoneInfo {
+                        name: tz.name().to_string(),
+                        offset_seconds: offset_secs,
+                        source: "IANA from GPS".to_string(),
+                    }),
+                    source_details: SourceDetails {
+                        time_source: naive_source.clone(),
+                        confidence: CONFIDENCE_HIGH.to_string(),
+                    },
+                });
             }
         }
 
         // --- Priority 3: Fixed Offset Time (Naive + Explicit Offset) ---
-        if let Some((offset_secs, ref offset_str, ref offset_source)) = potential_explicit_offset {
-            if let Some(offset) = FixedOffset::east_opt(offset_secs) {
-                if let LocalResult::Single(dt_with_offset)
+        if let Some((offset_secs, ref offset_str, ref offset_source)) = potential_explicit_offset
+            && let Some(offset) = FixedOffset::east_opt(offset_secs)
+                && let LocalResult::Single(dt_with_offset)
                 | LocalResult::Ambiguous(dt_with_offset, _) =
                     offset.from_local_datetime(&naive_dt)
-                {
-                    let utc_dt = dt_with_offset.with_timezone(&Utc);
-                    return Some(TimeInfo {
-                        datetime_utc: Some(utc_dt),
-                        datetime_naive: naive_dt,
-                        timezone: Some(TimeZoneInfo {
-                            name: offset_str.clone(),
-                            offset_seconds: offset_secs,
-                            source: offset_source.clone(),
-                        }),
-                        source_details: SourceDetails {
-                            time_source: naive_source.clone(),
-                            confidence: CONFIDENCE_HIGH.to_string(),
-                        },
-                    });
-                }
+            {
+                let utc_dt = dt_with_offset.with_timezone(&Utc);
+                return Some(TimeInfo {
+                    datetime_utc: Some(utc_dt),
+                    datetime_naive: naive_dt,
+                    timezone: Some(TimeZoneInfo {
+                        name: offset_str.clone(),
+                        offset_seconds: offset_secs,
+                        source: offset_source.clone(),
+                    }),
+                    source_details: SourceDetails {
+                        time_source: naive_source.clone(),
+                        confidence: CONFIDENCE_HIGH.to_string(),
+                    },
+                });
             }
-        }
     }
 
     // --- Priority 4: Accurate UTC ---
@@ -208,9 +201,9 @@ fn apply_priority_logic(
                 r"\b(\d{4})[-_]?(\d{2})[-_]?(\d{2})[-_ ]?(\d{2})[:_]?(\d{2})[:_]?(\d{2})\b",
             )
             .ok();
-            if let Some(re) = re {
-                if let Some(caps) = re.captures(filename) {
-                    if let (Ok(year), Ok(month), Ok(day), Ok(hour), Ok(min), Ok(sec)) = (
+            if let Some(re) = re
+                && let Some(caps) = re.captures(filename)
+                    && let (Ok(year), Ok(month), Ok(day), Ok(hour), Ok(min), Ok(sec)) = (
                         caps.get(1)
                             .map_or(Err(()), |m| m.as_str().parse::<i32>().map_err(|_| ())),
                         caps.get(2)
@@ -223,8 +216,8 @@ fn apply_priority_logic(
                             .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
                         caps.get(6)
                             .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
-                    ) {
-                        if let (Some(date), Some(time)) = (
+                    )
+                        && let (Some(date), Some(time)) = (
                             NaiveDate::from_ymd_opt(year, month, day),
                             NaiveTime::from_hms_opt(hour, min, sec),
                         ) {
@@ -238,9 +231,6 @@ fn apply_priority_logic(
                                 },
                             });
                         }
-                    }
-                }
-            }
         }
     }
 

@@ -1,7 +1,7 @@
+use base64::{Engine as _, engine::general_purpose};
+use mime_guess::MimeGuess;
 use std::fs;
-use std::path::Path;
-use base64::{engine::general_purpose, Engine as _};
-use mime_guess::MimeGuess; // so you can guess the media type
+use std::path::Path; // so you can guess the media type
 
 pub fn file_to_data_url<P: AsRef<Path>>(path: P) -> anyhow::Result<String> {
     // todo make image small first?
