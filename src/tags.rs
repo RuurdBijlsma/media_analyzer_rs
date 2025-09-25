@@ -22,35 +22,48 @@ pub struct TagData {
     pub video_fps: Option<f64>,
 }
 
-/// Detects if a filename indicates it's a burst photo and extracts the burst ID.
-fn detect_burst(filename_lower: &str) -> (bool, Option<String>) {
-    // The initial check is a good, fast way to exit if "burst" isn't in the name.
+/// Layer 2 of burst detection: Detects burst photos from filename conventions (primarily Android).
+fn detect_burst_from_filename(filename_lower: &str) -> (bool, Option<String>) {
     if !filename_lower.contains("burst") {
         return (false, None);
     }
 
     lazy_static! {
-        // This single, robust pattern captures the common filename prefix before "_burst".
-        // It works for both:
-        // - "20150813_160421_burst01.jpg" -> ID: "20150813_160421"
-        // - "00000img_00000_burst20201123164411530_cover.jpg" -> ID: "00000img_00000"
+        // Captures the common filename prefix before "_burst".
         static ref BURST_ID_PATTERN: Regex = Regex::new(r"(?i)(.*?)_burst.*").unwrap();
     }
 
     if let Some(caps) = BURST_ID_PATTERN.captures(filename_lower) {
-        // We capture the first group (.*?), which is the prefix.
         if let Some(id) = caps.get(1) {
             let burst_id = id.as_str();
-            // Ensure the captured ID is not empty (e.g., for a filename like "_burst.jpg")
             if !burst_id.is_empty() {
                 return (true, Some(burst_id.to_string()));
             }
         }
     }
-
-    // Return false if no valid ID could be extracted.
     (false, None)
 }
+
+/// Orchestrates burst detection using a multi-layered approach for maximum compatibility.
+fn find_burst_info(exif: &Value, filename_lower: &str) -> (bool, Option<String>) {
+    // Layer 1: Check for explicit EXIF burst tags (most reliable method).
+    // - BurstUUID is the standard for Apple devices.
+    // - GCamera:BurstId is a specific XMP tag used by Google Camera.
+    let exif_burst_id = exif.get("BurstUUID")
+        .or_else(|| exif.get("GCamera:BurstId"))
+        .or_else(|| exif.get("BurstId"))
+        .and_then(|v| v.as_str().map(String::from));
+
+    if let Some(id) = exif_burst_id {
+        if !id.is_empty() {
+            return (true, Some(id));
+        }
+    }
+
+    // Layer 2: Fallback to filename-based detection for other devices (e.g., Samsung).
+    detect_burst_from_filename(filename_lower)
+}
+
 
 fn detect_hdr(v: &Value) -> bool {
     // 1. Pixel: CompositeImage == 3
@@ -88,15 +101,15 @@ fn detect_hdr(v: &Value) -> bool {
     // 5. XMP / gain map detection
     if v.get("GainMapImage").is_some()
         || v.get("DirectoryItemSemantic")
-            .and_then(|x| x.as_array())
-            .map(|arr| {
-                arr.iter().any(|s| {
-                    s.as_str()
-                        .map(|s| s.eq_ignore_ascii_case("GainMap"))
-                        .unwrap_or(false)
-                })
+        .and_then(|x| x.as_array())
+        .map(|arr| {
+            arr.iter().any(|s| {
+                s.as_str()
+                    .map(|s| s.eq_ignore_ascii_case("GainMap"))
+                    .unwrap_or(false)
             })
-            .unwrap_or(false)
+        })
+        .unwrap_or(false)
     {
         return true;
     }
@@ -132,8 +145,10 @@ pub fn extract_tags(path: &Path, exif: &Value) -> TagData {
         .to_string_lossy()
         .to_lowercase();
 
-    // --- Tags from Filename ---
-    let (is_burst, burst_id) = detect_burst(&filename_lower);
+    // --- Multi-layered Burst Detection ---
+    let (is_burst, burst_id) = find_burst_info(exif, &filename_lower);
+
+    // --- Other Tags from Filename ---
     let is_night_sight = filename_lower.contains("night");
     let has_pano_in_filename = filename_lower.contains(".pano.");
 
@@ -162,11 +177,11 @@ pub fn extract_tags(path: &Path, exif: &Value) -> TagData {
     let projection_type = exif
         .get("XMP-GPano:ProjectionType")
         .or_else(|| exif.get("GPano:ProjectionType"))
-        .or_else(|| exif.get("ProjectionType")) // <-- Added to find the key from your PANO sample
+        .or_else(|| exif.get("ProjectionType"))
         .and_then(|v| v.as_str())
         .map(String::from);
 
-    // If a projection type exists, it requires a panorama viewer. This is more reliable.
+    // If a projection type exists, it requires a panorama viewer.
     let use_panorama_viewer = projection_type.is_some() || has_pano_in_filename;
 
     let is_photosphere = projection_type
@@ -180,11 +195,9 @@ pub fn extract_tags(path: &Path, exif: &Value) -> TagData {
         .or_else(|| exif.get("VideoFrameRate"))
         .and_then(parse_fps);
 
-    // Capture FPS is often the same as video FPS unless it's slow motion.
-    // Some devices might have a specific tag, but this is a reliable default.
     let capture_fps = exif
-        .get("SourceFrameRate") // A potential tag for capture FPS
-        .or_else(|| exif.get("AndroidCaptureFPS"))
+        .get("AndroidCaptureFPS")
+        .or_else(|| exif.get("SourceFrameRate"))
         .and_then(parse_fps)
         .or(video_fps);
 
@@ -202,10 +215,8 @@ pub fn extract_tags(path: &Path, exif: &Value) -> TagData {
         let desc = description.to_lowercase();
         desc.contains("time-lapse") || desc.contains("hyperlapse")
     } else if let Some(special_type) = exif.get("SpecialTypeID").and_then(|s| s.as_str()) {
-        // This is a specific tag used by Google Pixel for special video types.
         special_type.to_lowercase().contains("timelapse")
     } else {
-        // Fallback for other devices: very low FPS is a strong indicator.
         matches!(video_fps, Some(v_fps) if v_fps < 10.0)
     };
 
