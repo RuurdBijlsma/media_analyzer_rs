@@ -1,6 +1,6 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq,Serialize)]
+#[derive(Debug, Clone, PartialEq,Deserialize, Serialize)]
 pub struct PanoInfo {
     /// The calculated horizontal field of view in degrees.
     pub horizontal_fov_deg: f64,
@@ -13,7 +13,7 @@ pub struct PanoInfo {
 }
 
 /// Tags, such as is_panorama, is_motion_photo, is_night_sight.
-#[derive(Debug, PartialEq, Clone,Serialize)]
+#[derive(Debug, PartialEq, Clone,Deserialize, Serialize)]
 pub struct TagData {
     pub use_panorama_viewer: bool,
     pub pano_info: Option<PanoInfo>,

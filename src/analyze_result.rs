@@ -2,10 +2,10 @@ use crate::gps::GpsInfo;
 use crate::tags::structs::TagData;
 use crate::time::time_types::TimeInfo;
 use meteostat::Hourly;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AnalyzeResult {
     pub tags: TagData,
     pub exif: Value,

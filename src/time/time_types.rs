@@ -1,8 +1,8 @@
 use chrono::{DateTime, NaiveDateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Represents the extracted and consolidated time information for a media file.
-#[derive(Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TimeInfo {
     /// Timestamp guaranteed to be in UTC (ISO 8601 format with 'Z').
@@ -23,7 +23,7 @@ pub struct TimeInfo {
 }
 
 /// Contains details about the timezone determination.
-#[derive(Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TimeZoneInfo {
     /// The name or representation of the timezone.
@@ -38,7 +38,7 @@ pub struct TimeZoneInfo {
 }
 
 /// Provides context on the origin and reliability of the extracted time information.
-#[derive(Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceDetails {
     /// The primary EXIF tag or method used to determine `datetime_naive`
