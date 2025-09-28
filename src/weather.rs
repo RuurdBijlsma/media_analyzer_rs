@@ -12,6 +12,7 @@ pub async fn get_weather_info(
     let weather_info = client
         .hourly()
         .location(LatLon(gps_info.latitude, gps_info.longitude))
+        .max_distance_km(100.)
         .required_data(SpecificDate(datetime.date_naive()))
         .call()
         .await?
