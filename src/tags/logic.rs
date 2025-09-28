@@ -1,7 +1,6 @@
 use crate::tags::burst::find_burst_info;
 use crate::tags::fps::get_fps;
 use crate::tags::hdr::detect_hdr;
-use crate::tags::pano::get_pano_info;
 use crate::tags::structs::TagData;
 use serde_json::Value;
 use std::path::Path;
@@ -41,10 +40,6 @@ pub fn extract_tags(path: &Path, exif: &Value) -> TagData {
 
     let is_hdr = detect_hdr(exif);
 
-    // --- Panorama and Photosphere Detection ---
-    let (is_photosphere, use_panorama_viewer, projection_type, pano_info) =
-        get_pano_info(&filename_lower, exif);
-
     // --- Video Metadata ---
     let (video_fps, capture_fps) = get_fps(exif);
 
@@ -79,10 +74,6 @@ pub fn extract_tags(path: &Path, exif: &Value) -> TagData {
         is_slowmotion,
         is_night_sight,
         is_motion_photo,
-        is_photosphere,
-        projection_type,
-        pano_info,
-        use_panorama_viewer,
         motion_photo_presentation_timestamp,
     }
 }
@@ -142,19 +133,6 @@ mod tests {
             !tags.is_video,
             "Motion photos contain a video stream but is not a video."
         );
-    }
-
-    #[test]
-    fn test_photosphere() {
-        let tags = get_tags_for_asset("photosphere.jpg").unwrap();
-        assert!(tags.is_photosphere, "Should be detected as a photosphere");
-        assert!(tags.use_panorama_viewer, "Should require a panorama viewer");
-        assert_eq!(
-            tags.projection_type,
-            Some("equirectangular".to_string()),
-            "Projection type should be equirectangular"
-        );
-        assert!(!tags.is_video);
     }
 
     #[test]
@@ -228,10 +206,6 @@ mod tests {
             !tags_jpg.is_night_sight,
             "Standard JPG should not be night sight"
         );
-        assert!(
-            !tags_jpg.is_photosphere,
-            "Standard JPG should not be a photosphere"
-        );
 
         let tags_png = get_tags_for_asset("png_image.png").unwrap();
         assert!(!tags_png.is_video, "PNG should not be a video");
@@ -251,12 +225,9 @@ mod tests {
         assert!(!tags.is_hdr);
         assert!(!tags.is_motion_photo);
         assert!(!tags.is_night_sight);
-        assert!(!tags.is_photosphere);
         assert!(!tags.is_slowmotion);
         assert!(!tags.is_timelapse);
-        assert!(!tags.use_panorama_viewer);
         assert!(tags.burst_id.is_none());
-        assert!(tags.projection_type.is_none());
         assert!(tags.capture_fps.is_none());
         assert!(tags.video_fps.is_none());
     }

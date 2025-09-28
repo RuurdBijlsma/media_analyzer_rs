@@ -4,6 +4,7 @@ use crate::time::time_types::TimeInfo;
 use meteostat::Hourly;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use crate::pano::PanoInfo;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AnalyzeResult {
@@ -12,4 +13,5 @@ pub struct AnalyzeResult {
     pub time_info: TimeInfo,
     pub gps_info: Option<GpsInfo>,
     pub weather_info: Option<Hourly>,
+    pub pano_info: PanoInfo,
 }

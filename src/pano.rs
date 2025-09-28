@@ -1,10 +1,34 @@
-use crate::tags::structs::PanoInfo;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::path::Path;
 
-pub fn get_pano_info(
-    filename_lower: &str,
-    exif: &Value,
-) -> (bool, bool, Option<String>, Option<PanoInfo>) {
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct PanoInfo {
+    use_panorama_viewer: bool,
+    is_photosphere: bool,
+    view_info: Option<PanoViewInfo>,
+    projection_type: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct PanoViewInfo {
+    /// The calculated horizontal field of view in degrees.
+    pub horizontal_fov_deg: f64,
+    /// The calculated vertical field of view in degrees.
+    pub vertical_fov_deg: f64,
+    /// The horizontal center of the view in degrees (-180 to 180).
+    pub center_yaw_deg: f64,
+    /// The vertical center of the view in degrees (-90 to 90).
+    pub center_pitch_deg: f64,
+}
+
+pub fn get_pano_info(file_path: &Path, exif: &Value) -> PanoInfo {
+    let filename_lower = file_path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_lowercase();
+
     let has_pano_in_filename = filename_lower.contains(".pano.");
 
     let projection_type = exif
@@ -19,13 +43,13 @@ pub fn get_pano_info(
         .is_some_and(|s| s.eq_ignore_ascii_case("equirectangular"));
 
     // Step 2: If it's equirectangular, determine if it's a full sphere or a partial pano.
-    let pano_info: Option<PanoInfo> = if is_equirectangular {
+    let pano_info: Option<PanoViewInfo> = if is_equirectangular {
         // Attempt to parse the detailed GPano tags for a partial panorama.
         if let Some(partial_info) = parse_partial_pano_info(exif) {
             Some(partial_info)
         } else {
             // If the detailed tags are missing, assume it's a full 360° sphere.
-            Some(PanoInfo {
+            Some(PanoViewInfo {
                 horizontal_fov_deg: 360.,
                 vertical_fov_deg: 180.,
                 center_yaw_deg: 0.,
@@ -61,17 +85,17 @@ pub fn get_pano_info(
         false
     };
 
-    (
+    PanoInfo {
         use_panorama_viewer,
         is_photosphere,
         projection_type,
-        pano_info,
-    )
+        view_info: pano_info,
+    }
 }
 
 /// Parses the GPano EXIF tags to calculate the dimensions of a partial panorama.
 /// Returns None if the required tags are not present.
-pub fn parse_partial_pano_info(exif: &Value) -> Option<PanoInfo> {
+pub fn parse_partial_pano_info(exif: &Value) -> Option<PanoViewInfo> {
     // Attempt to get all six required values as f64. If any are missing, return None.
     let full_width = exif.get("FullPanoWidthPixels")?.as_f64()?;
     let full_height = exif.get("FullPanoHeightPixels")?.as_f64()?;
@@ -95,10 +119,39 @@ pub fn parse_partial_pano_info(exif: &Value) -> Option<PanoInfo> {
     // Pitch: Vertical center. 0 is horizon, 90 is up, -90 is down.
     let center_pitch_deg = ((cropped_top + cropped_height / 2.0) / full_height - 0.5) * -180.0;
 
-    Some(PanoInfo {
+    Some(PanoViewInfo {
         horizontal_fov_deg,
         vertical_fov_deg,
         center_yaw_deg,
         center_pitch_deg,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use exiftool::ExifTool;
+    use std::path::Path;
+
+    #[test]
+    fn test_photosphere() -> color_eyre::Result<()> {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("assets")
+            .join("photosphere.jpg");
+
+        let mut et = ExifTool::new()?;
+        let exif_data = et.json(&path, &["-n"])?;
+
+        let pano_info = get_pano_info(&path, &exif_data);
+        assert!(pano_info.is_photosphere, "Should be detected as a photosphere");
+        assert!(pano_info.use_panorama_viewer, "Should require a panorama viewer");
+        assert_eq!(
+            pano_info.projection_type,
+            Some("equirectangular".to_string()),
+            "Projection type should be equirectangular"
+        );
+        assert!(pano_info.view_info.is_some());
+
+        Ok(())
+    }
 }

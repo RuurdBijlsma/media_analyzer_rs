@@ -13,7 +13,7 @@ pub fn get_fps(value:&Value)->(Option<f64>, Option<f64>){
         .and_then(parse_fps)
         .or(video_fps);
 
-    return (video_fps, capture_fps);
+    (video_fps, capture_fps)
 }
 
 /// Parses frame rate values which can be integers, floats, or fractions (e.g., "30000/1001").

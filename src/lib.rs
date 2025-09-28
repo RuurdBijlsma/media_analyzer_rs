@@ -5,3 +5,4 @@ pub mod utils;
 pub mod weather;
 pub mod tags;
 pub mod analyze_result;
+pub mod pano;

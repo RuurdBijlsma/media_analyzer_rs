@@ -1524,6 +1524,7 @@ name = "media_analyzer"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "bon",
  "chrono",
  "chrono-tz",
  "color-eyre",
