@@ -2,13 +2,17 @@
 
 use super::extraction::{extract_time_components, get_string_field, ExtractedTimeComponents};
 use crate::gps::GpsInfo;
-use crate::time::time_types::{SourceDetails, TimeInfo, TimeZoneInfo, CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM};
-use chrono::{DateTime, FixedOffset, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc};
+use crate::time::time_types::{
+    SourceDetails, TimeInfo, TimeZoneInfo, CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM,
+};
+use chrono::{
+    DateTime, FixedOffset, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc,
+};
 use chrono_tz::Tz;
 use once_cell::sync::Lazy;
+use regex::Regex;
 use serde_json::Value;
 use std::str::FromStr;
-use regex::Regex;
 use tzf_rs::DefaultFinder;
 
 // --- Constants specific to the logic ---
@@ -18,9 +22,25 @@ const MAX_NAIVE_GPS_DIFF_SECONDS: i64 = 10;
 static FINDER: Lazy<DefaultFinder> = Lazy::new(DefaultFinder::new);
 
 /// Main entry point function - Extracts and processes time info.
-pub fn get_time_info(exif_info: &Value, gps_info: Option<&GpsInfo>) -> Option<TimeInfo> {
+pub fn get_time_info(exif_info: &Value, gps_info: Option<&GpsInfo>) -> TimeInfo {
     let components = extract_time_components(exif_info);
-    apply_priority_logic(components, gps_info, exif_info)
+    let time_result = apply_priority_logic(components, gps_info, exif_info);
+
+    time_result.unwrap_or_else(|| {
+        let dummy_datetime = NaiveDate::from_ymd_opt(1970, 1, 1)
+            .expect("01-01-1970 is a valid date.")
+            .and_hms_opt(0, 0, 0)
+            .expect("01-01-1970 00:00:00 is a valid datetime.");
+        TimeInfo {
+            datetime_utc: None,
+            source_details: SourceDetails {
+                time_source: "Error".to_string(),
+                confidence: "Error".to_string(),
+            },
+            datetime_naive: dummy_datetime,
+            timezone: None,
+        }
+    })
 }
 
 /// Applies the priority logic to extracted components and constructs the final TimeInfo.
@@ -114,25 +134,24 @@ fn apply_priority_logic(
         // --- Priority 3: Fixed Offset Time (Naive + Explicit Offset) ---
         if let Some((offset_secs, ref offset_str, ref offset_source)) = potential_explicit_offset
             && let Some(offset) = FixedOffset::east_opt(offset_secs)
-                && let LocalResult::Single(dt_with_offset)
-                | LocalResult::Ambiguous(dt_with_offset, _) =
-                    offset.from_local_datetime(&naive_dt)
-            {
-                let utc_dt = dt_with_offset.with_timezone(&Utc);
-                return Some(TimeInfo {
-                    datetime_utc: Some(utc_dt),
-                    datetime_naive: naive_dt,
-                    timezone: Some(TimeZoneInfo {
-                        name: offset_str.clone(),
-                        offset_seconds: offset_secs,
-                        source: offset_source.clone(),
-                    }),
-                    source_details: SourceDetails {
-                        time_source: naive_source.clone(),
-                        confidence: CONFIDENCE_HIGH.to_string(),
-                    },
-                });
-            }
+            && let LocalResult::Single(dt_with_offset) | LocalResult::Ambiguous(dt_with_offset, _) =
+                offset.from_local_datetime(&naive_dt)
+        {
+            let utc_dt = dt_with_offset.with_timezone(&Utc);
+            return Some(TimeInfo {
+                datetime_utc: Some(utc_dt),
+                datetime_naive: naive_dt,
+                timezone: Some(TimeZoneInfo {
+                    name: offset_str.clone(),
+                    offset_seconds: offset_secs,
+                    source: offset_source.clone(),
+                }),
+                source_details: SourceDetails {
+                    time_source: naive_source.clone(),
+                    confidence: CONFIDENCE_HIGH.to_string(),
+                },
+            });
+        }
     }
 
     // --- Priority 4: Accurate UTC ---
@@ -203,34 +222,35 @@ fn apply_priority_logic(
             .ok();
             if let Some(re) = re
                 && let Some(caps) = re.captures(filename)
-                    && let (Ok(year), Ok(month), Ok(day), Ok(hour), Ok(min), Ok(sec)) = (
-                        caps.get(1)
-                            .map_or(Err(()), |m| m.as_str().parse::<i32>().map_err(|_| ())),
-                        caps.get(2)
-                            .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
-                        caps.get(3)
-                            .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
-                        caps.get(4)
-                            .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
-                        caps.get(5)
-                            .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
-                        caps.get(6)
-                            .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
-                    )
-                        && let (Some(date), Some(time)) = (
-                            NaiveDate::from_ymd_opt(year, month, day),
-                            NaiveTime::from_hms_opt(hour, min, sec),
-                        ) {
-                            return Some(TimeInfo {
-                                datetime_utc: None,
-                                datetime_naive: NaiveDateTime::new(date, time),
-                                timezone: None,
-                                source_details: SourceDetails {
-                                    time_source: "FileName".to_string(),
-                                    confidence: CONFIDENCE_LOW.to_string(),
-                                },
-                            });
-                        }
+                && let (Ok(year), Ok(month), Ok(day), Ok(hour), Ok(min), Ok(sec)) = (
+                    caps.get(1)
+                        .map_or(Err(()), |m| m.as_str().parse::<i32>().map_err(|_| ())),
+                    caps.get(2)
+                        .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
+                    caps.get(3)
+                        .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
+                    caps.get(4)
+                        .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
+                    caps.get(5)
+                        .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
+                    caps.get(6)
+                        .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
+                )
+                && let (Some(date), Some(time)) = (
+                    NaiveDate::from_ymd_opt(year, month, day),
+                    NaiveTime::from_hms_opt(hour, min, sec),
+                )
+            {
+                return Some(TimeInfo {
+                    datetime_utc: None,
+                    datetime_naive: NaiveDateTime::new(date, time),
+                    timezone: None,
+                    source_details: SourceDetails {
+                        time_source: "FileName".to_string(),
+                        confidence: CONFIDENCE_LOW.to_string(),
+                    },
+                });
+            }
         }
     }
 

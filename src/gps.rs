@@ -1,6 +1,7 @@
+use serde::Serialize;
 use serde_json::Value;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq,Serialize)]
 pub struct GpsInfo {
     pub latitude: f64,
     pub longitude: f64,

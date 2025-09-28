@@ -8,9 +8,23 @@ use meteostat::Meteostat;
 use rand::prelude::IndexedRandom;
 use rand::rng;
 use std::path::Path;
+use media_analyzer::analyze_result::AnalyzeResult;
 use media_analyzer::tags::logic::extract_tags;
-// TODO: make rust package and output clean data structure
+// TODO: make rust package
 // add error handling
+// add to output result:
+// * pano info away from tags, to direct field
+// * path
+// * metadata(?):
+//  width: int
+//  height: int
+//  duration: float | None
+//  size_bytes: int
+//  format: str
+// camera_make
+// camera_model
+// iso
+// exposure
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
@@ -63,35 +77,25 @@ async fn main() -> color_eyre::Result<()> {
 
         let gps_info = get_gps_info(&numeric_exif).await;
         let time_info = get_time_info(&exif_info, gps_info.as_ref());
-        let _data_url = file_to_data_url(path);
-        // println!("{:?}", data_url);
-
-        if let Some(time_info) = &time_info
-            && let Some(gps_info) = &gps_info
-        {
-            let weather_info =
-                get_weather_info(&meteostat, gps_info, time_info.datetime_utc.unwrap())
-                    .await
-                    .ok()
-                    .flatten();
-            println!(
-                "{} - UTC: {:?}, NAIVE: {}, TEMP: {:?}, GPS: {:?}",
-                path.display(),
-                time_info.datetime_utc,
-                time_info.datetime_naive,
-                weather_info.and_then(|x| x.temperature),
-                gps_info,
-            );
-        } else if let Some(time_info) = &time_info {
-            println!(
-                "{} - UTC: {:?}, NAIVE: {}",
-                path.display(),
-                time_info.datetime_utc,
-                time_info.datetime_naive,
-            );
+        let data_url = file_to_data_url(path)?;
+        let weather_info = if let Some(ref gps) = gps_info {
+            get_weather_info(&meteostat, gps, time_info.datetime_utc.unwrap())
+                .await
+                .ok()
+                .flatten()
         } else {
-            println!("{} - NO TIMEINFO", path.display());
-        }
+            None
+        };
+
+
+        let analyze_result = AnalyzeResult{
+            exif: exif_info,
+            tags,
+            time_info,
+            weather_info,
+            gps_info,
+        };
+        println!("{}", serde_json::to_string_pretty(&analyze_result)?);
     }
 
     Ok(())
