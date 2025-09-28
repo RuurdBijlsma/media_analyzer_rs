@@ -2,5 +2,5 @@
 mod extraction;
 mod logic;
 mod parsing;
-pub mod time_types;
+pub mod structs;
 pub use logic::get_time_info;

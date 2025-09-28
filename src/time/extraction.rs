@@ -8,6 +8,7 @@ use chrono::{DateTime, FixedOffset, NaiveDateTime, Utc};
 use serde_json::Value;
 
 #[derive(Debug)]
+/// Intermediate data structure
 pub struct ExtractedTimeComponents {
     pub best_naive: Option<(NaiveDateTime, String)>, // (DateTime, Source Tag Name)
     pub potential_utc: Option<(DateTime<Utc>, String)>, // (DateTime, Source Tag Name)
@@ -38,13 +39,14 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
     for (group, field, _is_subsec_field) in naive_sources_priority {
         if primary_naive_candidate.is_none()
             && let Some(dt_str) = get_string_field(exif_info, group, field)
-                && let Some((dt, parsed_subsec)) = parse_naive(dt_str) {
-                    let source_name = field.to_string();
-                    primary_naive_candidate = Some((dt, source_name));
-                    if parsed_subsec {
-                        found_subsecond_number_source = Some(("_ParsedFromString_".to_string(), 0));
-                    }
-                }
+            && let Some((dt, parsed_subsec)) = parse_naive(dt_str)
+        {
+            let source_name = field.to_string();
+            primary_naive_candidate = Some((dt, source_name));
+            if parsed_subsec {
+                found_subsecond_number_source = Some(("_ParsedFromString_".to_string(), 0));
+            }
+        }
 
         if primary_naive_candidate.is_some()
             && found_subsecond_number_source
@@ -61,20 +63,20 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
                 && primary_naive_candidate
                     .as_ref()
                     .is_some_and(|(_, src)| *src == base_field_name || *src == field)
-                {
-                    found_subsecond_number_source = Some((sub_sec_num_field, subsec_num));
-                }
+            {
+                found_subsecond_number_source = Some((sub_sec_num_field, subsec_num));
+            }
 
             let simpler_sub_sec_field =
                 format!("SubSecond{}", base_field_name.replace("DateTime", ""));
             if found_subsecond_number_source.is_none()
                 && let Some(subsec_num) = get_number_field(exif_info, group, &simpler_sub_sec_field)
-                    && primary_naive_candidate
-                        .as_ref()
-                        .is_some_and(|(_, src)| *src == base_field_name || *src == field)
-                    {
-                        found_subsecond_number_source = Some((simpler_sub_sec_field, subsec_num));
-                    }
+                && primary_naive_candidate
+                    .as_ref()
+                    .is_some_and(|(_, src)| *src == base_field_name || *src == field)
+            {
+                found_subsecond_number_source = Some((simpler_sub_sec_field, subsec_num));
+            }
         }
 
         if primary_naive_candidate.is_some() && found_subsecond_number_source.is_some() {
@@ -100,19 +102,21 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
 
     // --- Potential UTC Time ---
     if let Some(gps_dt_str) = get_string_field(exif_info, "Time", "GPSDateTime")
-        && let Some(dt_utc) = parse_datetime_utc_z(gps_dt_str) {
-            potential_utc = Some((dt_utc, "GPSDateTime".to_string()));
-        }
+        && let Some(dt_utc) = parse_datetime_utc_z(gps_dt_str)
+    {
+        potential_utc = Some((dt_utc, "GPSDateTime".to_string()));
+    }
     if potential_utc.is_none()
         && let (Some(date_str), Some(time_str)) = (
             get_string_field(exif_info, "Time", "GPSDateStamp"),
             get_string_field(exif_info, "Time", "GPSTimeStamp"),
-        ) {
-            let combined_str = format!("{} {}Z", date_str, time_str);
-            if let Some(dt_utc) = parse_datetime_utc_z(&combined_str) {
-                potential_utc = Some((dt_utc, "GPSDateStamp/GPSTimeStamp".to_string()));
-            }
+        )
+    {
+        let combined_str = format!("{} {}Z", date_str, time_str);
+        if let Some(dt_utc) = parse_datetime_utc_z(&combined_str) {
+            potential_utc = Some((dt_utc, "GPSDateStamp/GPSTimeStamp".to_string()));
         }
+    }
 
     // --- Potential Explicit Offset ---
     let offset_sources_priority = [

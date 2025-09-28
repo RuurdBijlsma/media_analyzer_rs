@@ -1,26 +1,6 @@
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::Path;
-
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct PanoInfo {
-    use_panorama_viewer: bool,
-    is_photosphere: bool,
-    view_info: Option<PanoViewInfo>,
-    projection_type: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct PanoViewInfo {
-    /// The calculated horizontal field of view in degrees.
-    pub horizontal_fov_deg: f64,
-    /// The calculated vertical field of view in degrees.
-    pub vertical_fov_deg: f64,
-    /// The horizontal center of the view in degrees (-180 to 180).
-    pub center_yaw_deg: f64,
-    /// The vertical center of the view in degrees (-90 to 90).
-    pub center_pitch_deg: f64,
-}
+use crate::other::structs::{PanoInfo, PanoViewInfo};
 
 pub fn get_pano_info(file_path: &Path, exif: &Value) -> PanoInfo {
     let filename_lower = file_path
@@ -136,7 +116,7 @@ mod tests {
     #[test]
     fn test_photosphere() -> color_eyre::Result<()> {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("assets")
+            .join("../../assets")
             .join("photosphere.jpg");
 
         let mut et = ExifTool::new()?;

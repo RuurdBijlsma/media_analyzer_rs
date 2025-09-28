@@ -1,8 +1,7 @@
 //! Core logic for determining the best time representation based on extracted components.
 
 use super::extraction::{extract_time_components, get_string_field, ExtractedTimeComponents};
-use crate::gps::GpsInfo;
-use crate::time::time_types::{
+use crate::time::structs::{
     SourceDetails, TimeInfo, TimeZoneInfo, CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM,
 };
 use chrono::{
@@ -14,6 +13,7 @@ use regex::Regex;
 use serde_json::Value;
 use std::str::FromStr;
 use tzf_rs::DefaultFinder;
+use crate::other::structs::GpsInfo;
 
 // --- Constants specific to the logic ---
 const MAX_NAIVE_GPS_DIFF_SECONDS: i64 = 10;

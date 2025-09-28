@@ -1,17 +1,18 @@
-use crate::gps::GpsInfo;
+
 use crate::tags::structs::TagData;
-use crate::time::time_types::TimeInfo;
-use meteostat::Hourly;
+use crate::time::structs::TimeInfo;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::pano::PanoInfo;
+use crate::other::structs::{GpsInfo, MediaMetadata, PanoInfo, WeatherInfo};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AnalyzeResult {
+    pub metadata: MediaMetadata,
     pub tags: TagData,
     pub exif: Value,
     pub time_info: TimeInfo,
     pub gps_info: Option<GpsInfo>,
-    pub weather_info: Option<Hourly>,
+    pub weather_info: Option<WeatherInfo>,
     pub pano_info: PanoInfo,
+    pub data_url: String,
 }

@@ -1,12 +1,5 @@
-use serde::{Deserialize, Serialize};
+use crate::other::structs::GpsInfo;
 use serde_json::Value;
-
-#[derive(Debug, Clone, PartialEq,Deserialize, Serialize)]
-pub struct GpsInfo {
-    pub latitude: f64,
-    pub longitude: f64,
-    pub altitude: Option<f64>,
-}
 
 pub async fn get_gps_info(numeric_exif: &Value) -> Option<GpsInfo> {
     let (latitude, longitude) = match (
