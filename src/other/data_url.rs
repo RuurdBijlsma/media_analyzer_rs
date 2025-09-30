@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose, Engine as _};
+use color_eyre::eyre;
 use image::ImageFormat;
 use mime_guess::MimeGuess;
-use std::fs;
 use std::io::Cursor;
 use std::path::Path;
 
@@ -35,14 +35,7 @@ pub fn file_to_data_url<P: AsRef<Path>>(path: P) -> color_eyre::Result<String> {
         // 6. Format the data URL. Since we encoded it as a JPEG, we use "image/jpeg".
         let data_url = format!("data:image/jpeg;base64,{}", b64);
         Ok(data_url)
-
     } else {
-        // --- ORIGINAL FALLBACK LOGIC for non-image files (videos, etc.) ---
-
-        let data = fs::read(path)?;
-        let b64 = general_purpose::STANDARD.encode(&data);
-        let mime_type = mime.essence_str();
-        let data_url = format!("data:{};base64,{}", mime_type, b64);
-        Ok(data_url)
+        eyre::bail!("Unsupported file type")
     }
 }

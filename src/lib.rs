@@ -3,3 +3,4 @@ pub mod utils;
 pub mod tags;
 pub mod structs;
 pub mod other;
+pub mod media_analyzer;
