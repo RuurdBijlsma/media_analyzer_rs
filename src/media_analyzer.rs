@@ -10,8 +10,8 @@ use bon::bon;
 use color_eyre::eyre::eyre;
 use exiftool::ExifTool;
 use meteostat::Meteostat;
-use std::path::{Path, PathBuf};
 use reverse_geocoder::ReverseGeocoder;
+use std::path::{Path, PathBuf};
 
 pub struct MediaAnalyzer {
     geocoder: ReverseGeocoder,

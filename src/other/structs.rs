@@ -44,7 +44,7 @@ pub struct PanoViewInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub struct LocationName{
+pub struct LocationName {
     pub latitude: f64,
     pub longitude: f64,
     pub name: String,
