@@ -11,8 +11,10 @@ use color_eyre::eyre::eyre;
 use exiftool::ExifTool;
 use meteostat::Meteostat;
 use std::path::{Path, PathBuf};
+use reverse_geocoder::ReverseGeocoder;
 
 pub struct MediaAnalyzer {
+    geocoder: ReverseGeocoder,
     exiftool: ExifTool,
     meteostat: Meteostat,
 }
@@ -46,7 +48,9 @@ impl MediaAnalyzer {
             Some(cache_folder) => Meteostat::with_cache_folder(cache_folder).await?,
             None => Meteostat::new().await?,
         };
+        let geocoder = ReverseGeocoder::new();
         Ok(Self {
+            geocoder,
             exiftool,
             meteostat,
         })
@@ -96,7 +100,7 @@ impl MediaAnalyzer {
 
         let metadata = get_metadata(&numeric_exif)?;
         let tags = extract_tags(media_file, &numeric_exif);
-        let gps_info = get_gps_info(&numeric_exif).await;
+        let gps_info = get_gps_info(&self.geocoder, &numeric_exif).await;
         let time_info = get_time_info(&exif_info, gps_info.as_ref());
         let pano_info = get_pano_info(media_file, &numeric_exif);
 

@@ -38,6 +38,8 @@ lazy_static = "1.5.0"
 bon = "3.7.2"
 image = "0.25.8"
 sunrise = "2.1.0"
+reverse_geocoder = "4.1.1"
+rust_iso3166 = "0.1.14"
 
 
 [dev-dependencies]
