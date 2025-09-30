@@ -6,7 +6,6 @@ use std::path::Path;
 // add gps accuracy to gpsInfo
 // add bearing/movement speed to gpsInfo
 
-
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;

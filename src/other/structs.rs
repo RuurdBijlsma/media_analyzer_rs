@@ -7,6 +7,7 @@ pub struct GpsInfo {
     pub latitude: f64,
     pub longitude: f64,
     pub altitude: Option<f64>,
+    pub location: LocationName,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -40,6 +41,17 @@ pub struct PanoViewInfo {
     pub center_yaw_deg: f64,
     /// The vertical center of the view in degrees (-90 to 90).
     pub center_pitch_deg: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct LocationName {
+    pub latitude: f64,
+    pub longitude: f64,
+    pub name: String,
+    pub admin1: String,
+    pub admin2: String,
+    pub country_code: String,
+    pub country_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

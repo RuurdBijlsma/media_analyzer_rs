@@ -1,9 +1,8 @@
-
+use crate::other::structs::{GpsInfo, MediaMetadata, PanoInfo, WeatherInfo};
 use crate::tags::structs::TagData;
 use crate::time::structs::TimeInfo;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::other::structs::{GpsInfo, MediaMetadata, PanoInfo, WeatherInfo};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AnalyzeResult {

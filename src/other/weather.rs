@@ -47,8 +47,8 @@ pub async fn get_weather_info(
         .await?
         .get_at(datetime)?
         .collect_single_hourly();
-    Ok(WeatherInfo{
+    Ok(WeatherInfo {
         hourly: weather_info.ok(),
-        sun_info: compute_sun_info(datetime, gps_info).expect("I don't think this will fail.")
+        sun_info: compute_sun_info(datetime, gps_info).expect("I don't think this will fail."),
     })
 }

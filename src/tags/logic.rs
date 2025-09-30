@@ -78,8 +78,6 @@ pub fn extract_tags(path: &Path, exif: &Value) -> TagData {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;

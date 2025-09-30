@@ -42,8 +42,8 @@
 //! ```
 
 pub mod media_analyzer;
+pub mod other;
 pub mod structs;
 pub mod tags;
 pub mod time;
 pub mod utils;
-pub mod other;

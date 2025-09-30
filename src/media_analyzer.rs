@@ -1,8 +1,3 @@
-use bon::bon;
-use color_eyre::eyre::eyre;
-use exiftool::ExifTool;
-use meteostat::Meteostat;
-use std::path::{Path, PathBuf};
 use crate::other::data_url::file_to_data_url;
 use crate::other::gps::get_gps_info;
 use crate::other::metadata::get_metadata;
@@ -11,8 +6,15 @@ use crate::other::weather::get_weather_info;
 use crate::structs::AnalyzeResult;
 use crate::tags::logic::extract_tags;
 use crate::time::get_time_info;
+use bon::bon;
+use color_eyre::eyre::eyre;
+use exiftool::ExifTool;
+use meteostat::Meteostat;
+use reverse_geocoder::ReverseGeocoder;
+use std::path::{Path, PathBuf};
 
 pub struct MediaAnalyzer {
+    geocoder: ReverseGeocoder,
     exiftool: ExifTool,
     meteostat: Meteostat,
 }
@@ -46,7 +48,9 @@ impl MediaAnalyzer {
             Some(cache_folder) => Meteostat::with_cache_folder(cache_folder).await?,
             None => Meteostat::new().await?,
         };
+        let geocoder = ReverseGeocoder::new();
         Ok(Self {
+            geocoder,
             exiftool,
             meteostat,
         })
@@ -96,7 +100,7 @@ impl MediaAnalyzer {
 
         let metadata = get_metadata(&numeric_exif)?;
         let tags = extract_tags(media_file, &numeric_exif);
-        let gps_info = get_gps_info(&numeric_exif).await;
+        let gps_info = get_gps_info(&self.geocoder, &numeric_exif).await;
         let time_info = get_time_info(&exif_info, gps_info.as_ref());
         let pano_info = get_pano_info(media_file, &numeric_exif);
 

@@ -1,5 +1,5 @@
 use crate::other::structs::MediaMetadata;
-use color_eyre::eyre::{eyre, Context};
+use color_eyre::eyre::{Context, eyre};
 use serde_json::Value;
 
 /// Extracts media metadata from a serde_json::Value object for both images and videos.
@@ -45,7 +45,6 @@ pub fn get_metadata(exif_data: &Value) -> color_eyre::Result<MediaMetadata> {
     // Get camera make and model
     let camera_make = get_string("Make").ok();
     let camera_model = get_string("Model").ok();
-
 
     Ok(MediaMetadata {
         width,
