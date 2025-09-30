@@ -37,7 +37,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y libfontconfig1-dev pkg-config
+          sudo apt-get install -y libfontconfig1-dev pkg-config exiftool
 
       # Format check
       - name: Check formatting
