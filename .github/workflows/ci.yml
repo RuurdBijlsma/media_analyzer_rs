@@ -39,18 +39,22 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y libfontconfig1-dev pkg-config exiftool
 
+      # Build the code
+      - name: Build
+        run: cargo build --all-targets --all-features
+
       # Format check
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      # Strict Clippy checks
+      # Run Clippy
       - name: Run Clippy (strict)
         run: |
           cargo clippy --all-targets --all-features -- -D warnings -A clippy::missing_errors_doc -A clippy::missing_panics_doc
 
       # Run tests
       - name: Run tests
-        run: cargo test -- --test-threads 1
+        run: cargo test --no-build -- --test-threads 1
 
       # Documentation check
       - name: Check documentation
