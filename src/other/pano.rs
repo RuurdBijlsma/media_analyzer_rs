@@ -116,7 +116,7 @@ mod tests {
     #[test]
     fn test_photosphere() -> color_eyre::Result<()> {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../assets")
+            .join("assets")
             .join("photosphere.jpg");
 
         let mut et = ExifTool::new()?;
