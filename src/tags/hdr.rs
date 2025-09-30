@@ -36,15 +36,15 @@ pub fn detect_hdr(v: &Value) -> bool {
     // 5. XMP / gain map detection
     if v.get("GainMapImage").is_some()
         || v.get("DirectoryItemSemantic")
-        .and_then(|x| x.as_array())
-        .map(|arr| {
-            arr.iter().any(|s| {
-                s.as_str()
-                    .map(|s| s.eq_ignore_ascii_case("GainMap"))
-                    .unwrap_or(false)
+            .and_then(|x| x.as_array())
+            .map(|arr| {
+                arr.iter().any(|s| {
+                    s.as_str()
+                        .map(|s| s.eq_ignore_ascii_case("GainMap"))
+                        .unwrap_or(false)
+                })
             })
-        })
-        .unwrap_or(false)
+            .unwrap_or(false)
     {
         return true;
     }

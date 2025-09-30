@@ -1,6 +1,6 @@
+use crate::other::structs::{PanoInfo, PanoViewInfo};
 use serde_json::Value;
 use std::path::Path;
-use crate::other::structs::{PanoInfo, PanoViewInfo};
 
 pub fn get_pano_info(file_path: &Path, exif: &Value) -> PanoInfo {
     let filename_lower = file_path
@@ -123,8 +123,14 @@ mod tests {
         let exif_data = et.json(&path, &["-n"])?;
 
         let pano_info = get_pano_info(&path, &exif_data);
-        assert!(pano_info.is_photosphere, "Should be detected as a photosphere");
-        assert!(pano_info.use_panorama_viewer, "Should require a panorama viewer");
+        assert!(
+            pano_info.is_photosphere,
+            "Should be detected as a photosphere"
+        );
+        assert!(
+            pano_info.use_panorama_viewer,
+            "Should require a panorama viewer"
+        );
         assert_eq!(
             pano_info.projection_type,
             Some("equirectangular".to_string()),

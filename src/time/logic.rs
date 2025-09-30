@@ -1,8 +1,9 @@
 //! Core logic for determining the best time representation based on extracted components.
 
-use super::extraction::{extract_time_components, get_string_field, ExtractedTimeComponents};
+use super::extraction::{ExtractedTimeComponents, extract_time_components, get_string_field};
+use crate::other::structs::GpsInfo;
 use crate::time::structs::{
-    SourceDetails, TimeInfo, TimeZoneInfo, CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM,
+    CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, SourceDetails, TimeInfo, TimeZoneInfo,
 };
 use chrono::{
     DateTime, FixedOffset, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc,
@@ -13,7 +14,6 @@ use regex::Regex;
 use serde_json::Value;
 use std::str::FromStr;
 use tzf_rs::DefaultFinder;
-use crate::other::structs::GpsInfo;
 
 // --- Constants specific to the logic ---
 const MAX_NAIVE_GPS_DIFF_SECONDS: i64 = 10;

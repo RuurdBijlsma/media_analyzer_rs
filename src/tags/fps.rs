@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-pub fn get_fps(value:&Value)->(Option<f64>, Option<f64>){
+pub fn get_fps(value: &Value) -> (Option<f64>, Option<f64>) {
     let video_fps = value
         .get("AvgFrameRate")
         .or_else(|| value.get("FrameRate"))

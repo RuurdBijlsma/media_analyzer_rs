@@ -1,8 +1,3 @@
-use bon::bon;
-use color_eyre::eyre::eyre;
-use exiftool::ExifTool;
-use meteostat::Meteostat;
-use std::path::{Path, PathBuf};
 use crate::other::data_url::file_to_data_url;
 use crate::other::gps::get_gps_info;
 use crate::other::metadata::get_metadata;
@@ -11,6 +6,11 @@ use crate::other::weather::get_weather_info;
 use crate::structs::AnalyzeResult;
 use crate::tags::logic::extract_tags;
 use crate::time::get_time_info;
+use bon::bon;
+use color_eyre::eyre::eyre;
+use exiftool::ExifTool;
+use meteostat::Meteostat;
+use std::path::{Path, PathBuf};
 
 pub struct MediaAnalyzer {
     exiftool: ExifTool,
