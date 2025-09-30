@@ -54,7 +54,7 @@ jobs:
 
       # Run tests
       - name: Run tests
-        run: cargo test --no-build -- --test-threads 1
+        run: cargo test -- --test-threads 1
 
       # Documentation check
       - name: Check documentation
