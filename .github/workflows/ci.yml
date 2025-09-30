@@ -34,10 +34,11 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y libfontconfig1-dev pkg-config exiftool
+      - name: Cache and install system dependencies
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libfontconfig1-dev pkg-config exiftool
+          version: 1.0
 
       # Build the code
       - name: Build
