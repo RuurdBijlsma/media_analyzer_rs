@@ -3,6 +3,7 @@ use serde_json::Value;
 use std::path::Path;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PanoInfo {
     pub use_panorama_viewer: bool,
     pub is_photosphere: bool,
@@ -11,6 +12,7 @@ pub struct PanoInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PanoViewInfo {
     /// The calculated horizontal field of view in degrees.
     pub horizontal_fov_deg: f64,

@@ -1,4 +1,3 @@
-use crate::MediaAnalyzerError;
 use crate::features::data_url::file_to_data_url;
 use crate::features::error::WeatherError;
 use crate::features::gps::get_gps_info;
@@ -8,12 +7,30 @@ use crate::features::weather::get_weather_info;
 use crate::structs::AnalyzeResult;
 use crate::tags::logic::extract_tags;
 use crate::time::get_time_info;
+use crate::MediaAnalyzerError;
 use bon::bon;
 use exiftool::ExifTool;
 use meteostat::Meteostat;
 use reverse_geocoder::ReverseGeocoder;
 use std::path::{Path, PathBuf};
 
+/// The main entry point for the media analysis pipeline.
+///
+/// This struct holds the initialized clients and configuration needed to perform
+/// analysis. It is designed to be created once and reused for analyzing multiple files.
+///
+/// Use the builder pattern to construct an instance:
+/// ```rust
+/// # use media_analyzer::{MediaAnalyzer, MediaAnalyzerError};
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), MediaAnalyzerError> {
+/// let analyzer = MediaAnalyzer::builder()
+///     .thumbnail_max_size((50, 50)) // Optionally configure parameters
+///     .build()
+///     .await?;
+/// # Ok(())
+/// # }
+/// ```
 pub struct MediaAnalyzer {
     geocoder: ReverseGeocoder,
     exiftool: ExifTool,
@@ -24,20 +41,39 @@ pub struct MediaAnalyzer {
 
 #[bon]
 impl MediaAnalyzer {
-    /// Creates a new instance of `MediaAnalyzer`.
+    /// Constructs a `MediaAnalyzer` via a builder pattern.
     ///
-    /// This function initializes the `ExifTool` and `Meteostat` services.
+    /// This is the main constructor for the analyzer. It initializes all necessary services
+    /// and allows for custom configuration of its behavior.
     ///
-    /// # Arguments
+    /// # Builder Arguments
     ///
-    /// * `exiftool_path` - An optional path to the `exiftool` executable. If `None`, the crate will attempt to find it in the system's PATH.
-    /// * `cache_folder` - An optional path to a directory for caching `Meteostat` data. If `None`, a default cache location will be used.
+    /// * `exiftool_path: Option<PathBuf>` - An optional path to a specific `exiftool` executable. If `None`, `exiftool` will be searched for in the system's PATH.
+    /// * `cache_folder: Option<PathBuf>` - An optional path to a directory for caching `Meteostat` data. Using a cache significantly speeds up repeated requests for the same location. If `None`, a default OS-specific cache location will be used.
+    /// * `weather_search_radius_km: f64` - (Default: `100.0`) The maximum distance in kilometers to search for a weather station from the media's GPS coordinates.
+    /// * `thumbnail_max_size: (u32, u32)` - (Default: `(10, 10)`) The maximum width and height for the generated data URL thumbnail. The image will be downscaled to fit within these dimensions while preserving its aspect ratio.
     ///
     /// # Errors
     ///
     /// This function will return an error if:
-    /// * `exiftool` cannot be found or initialized.
-    /// * The `Meteostat` service cannot be initialized, for example, due to issues with the cache folder.
+    /// * The `exiftool` executable cannot be found or fails to start.
+    /// * The `Meteostat` service fails to initialize, for example, due to network issues or an inaccessible cache folder.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use media_analyzer::{MediaAnalyzer, MediaAnalyzerError};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MediaAnalyzerError> {
+    /// // Create an analyzer with a custom thumbnail size and weather search radius.
+    /// let analyzer = MediaAnalyzer::builder()
+    ///     .thumbnail_max_size((25, 25))
+    ///     .weather_search_radius_km(50.0)
+    ///     .build()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     #[builder]
     pub async fn new(
         exiftool_path: Option<PathBuf>,
@@ -63,35 +99,55 @@ impl MediaAnalyzer {
         })
     }
 
-    /// Analyzes a media file to extract a wide range of information.
+    /// Analyzes a media file and extracts a set of metadata.
     ///
-    /// This is the primary function of the crate. It takes a path to a media file
-    /// and a list of frame paths (for generating a thumbnail) and returns an
-    /// `AnalyzeResult` struct containing all the extracted data.
+    /// This is the primary analysis function. It orchestrates all the individual parsing
+    /// and data-gathering modules to produce a single, consolidated `AnalyzeResult`.
     ///
     /// # Arguments
     ///
     /// * `media_file` - A path to the video or photo file to be analyzed.
-    /// * `frames` - A vector of paths to thumbnail frames. The first frame is used to generate a data URL.
+    /// * `thumbnail` - A path to an image file to be used for generating a thumbnail data URL. For photos, this can be the same path as `media_file`. For videos, this should be a path to an extracted frame.
     ///
     /// # Returns
     ///
-    /// A `Result<AnalyzeResult, MediaAnalyzerError>` which, on success, contains:
-    /// * `exif` - Raw Exif data.
-    /// * `tags` - Identified tags such as `is_motion_photo` or `is_night_sight`.
-    /// * `time_info` - Time the media was taken, including timezone information.
-    /// * `weather_info` - Weather data at the time and location of capture, including sunrise and sunset times.
-    /// * `gps_info` - GPS location data, including the location's name.
-    /// * `pano_info` - Information related to panoramic photos.
-    /// * `data_url` - A base64-encoded data URL of the first thumbnail frame.
-    /// * `metadata` - Basic information like width, height, duration, and MIME type.
+    /// On success, returns a `Result` containing an [`AnalyzeResult`] struct with the following fields:
+    /// * `exif`: The raw, grouped (`-g2`) JSON output from `exiftool`.
+    /// * `metadata`: Core file properties like width, height, and duration.
+    /// * `capture_details`: Photographic details like ISO, aperture, and camera model.
+    /// * `tags`: Boolean flags for special media types (e.g., `is_motion_photo`, `is_slowmotion`).
+    /// * `time_info`: Consolidated time information, including the best-guess UTC timestamp and timezone.
+    /// * `pano_info`: Data related to panoramic images, including photospheres.
+    /// * `data_url`: A small, Base64-encoded JPEG data URL for use as a blurred preview.
+    /// * `gps_info`: GPS coordinates and reverse-geocoded location details.
+    /// * `weather_info`: Historical weather and sun information for the time and place of capture. This is a "best-effort" field and will be `None` if GPS or time data is missing, or if the weather service fails.
     ///
     /// # Errors
     ///
-    /// This function will return an error if:
-    /// * No thumbnail frames are provided.
-    /// * The thumbnail cannot be converted to a data URL.
-    /// * `exiftool` fails to extract JSON data from the media file.
+    /// This function will return an error if any of the critical analysis steps fail, such as:
+    /// * [`MediaAnalyzerError::DataUrl`]: The provided `thumbnail` path is invalid or not an image.
+    /// * [`MediaAnalyzerError::Exiftool`]: `exiftool` fails to execute or read the `media_file`.
+    /// * [`MediaAnalyzerError::Metadata`]: The `media_file` is missing essential metadata (e.g., `ImageWidth`).
+    /// * [`MediaAnalyzerError::Time`]: No usable time information could be extracted from any source.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use std::path::Path;
+    /// # use media_analyzer::{MediaAnalyzer, MediaAnalyzerError};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MediaAnalyzerError> {
+    /// let mut analyzer = MediaAnalyzer::builder().build().await?;
+    /// let photo_path = Path::new("assets/tent.jpg");
+    ///
+    /// // Analyze a photo, using the photo itself as the thumbnail source.
+    /// let result = analyzer.analyze_media(photo_path, photo_path).await?;
+    ///
+    /// println!("Photo taken in {:?}", result.gps_info.unwrap().location);
+    /// println!("Camera Model: {}", result.capture_details.camera_model.unwrap_or_default());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn analyze_media(
         &mut self,
         media_file: &Path,
@@ -107,11 +163,8 @@ impl MediaAnalyzer {
         let gps_info = get_gps_info(&self.geocoder, &numeric_exif).await;
         let pano_info = get_pano_info(media_file, &numeric_exif);
 
-        // This is now fallible, so we use '?'
         let time_info = get_time_info(&exif_info, gps_info.as_ref())?;
 
-        // Get weather info only if we have both GPS and a valid UTC time.
-        // We use .ok() to treat weather as "best-effort" and not fail the whole analysis.
         let weather_info =
             if let (Some(gps), Some(utc_time)) = (gps_info.as_ref(), time_info.datetime_utc) {
                 get_weather_info(

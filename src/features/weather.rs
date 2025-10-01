@@ -1,17 +1,19 @@
 use crate::GpsInfo;
 use crate::features::error::WeatherError;
 use chrono::{DateTime, Utc};
-use meteostat::{Hourly, LatLon, Meteostat};
+use meteostat::{Hourly, LatLon, Meteostat, RequiredData};
 use serde::{Deserialize, Serialize};
 use sunrise::{Coordinates, DawnType, SolarDay, SolarEvent};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WeatherInfo {
     pub hourly: Option<Hourly>,
     pub sun_info: SunInfo,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SunInfo {
     pub sunrise: DateTime<Utc>,
     pub sunset: DateTime<Utc>,
@@ -48,19 +50,21 @@ pub async fn get_weather_info(
     datetime: DateTime<Utc>,
     weather_search_radius_km: f64,
 ) -> Result<WeatherInfo, WeatherError> {
-    let hourly_call = client
+    let hourly_frame = client
         .hourly()
         .location(LatLon(gps_info.latitude, gps_info.longitude))
+        .required_data(RequiredData::SpecificDate(datetime.date_naive()))
         .max_distance_km(weather_search_radius_km)
         .call()
         .await?;
 
     // Handle the case where there is data, but not for the specific hour requested
-    let weather_info = hourly_call
+    let weather_info = hourly_frame
         .get_at(datetime)
         .map_err(|_| WeatherError::NoDataAvailable)?
-        .collect_single_hourly()
-        .ok();
+        .collect_single_hourly();
+
+    let weather_info = weather_info.ok();
 
     // Use '?' on our fallible internal function
     let sun_info = compute_sun_info(datetime, gps_info)?;

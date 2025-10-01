@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct FileMetadata {
     pub width: u64,
     pub height: u64,
@@ -12,6 +13,7 @@ pub struct FileMetadata {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct CaptureDetails {
     pub iso: Option<u64>,
     pub exposure_time: Option<f64>,

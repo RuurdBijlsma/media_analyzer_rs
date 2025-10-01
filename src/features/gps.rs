@@ -9,6 +9,7 @@ pub enum DirectionRef {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GpsInfo {
     pub latitude: f64,
     pub longitude: f64,
@@ -19,6 +20,7 @@ pub struct GpsInfo {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LocationName {
     pub latitude: f64,
     pub longitude: f64,

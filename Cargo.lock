@@ -2048,9 +2048,9 @@ dependencies = [
 
 [[package]]
 name = "meteostat"
-version = "0.4.3"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e770e7bbb315f9331166172325830163329c7132554ca6d8cf126b08984793a"
+checksum = "6199506b48ed916df7fad7b638aced978f4ef89e8d70c99dc4054c9299ce3d3a"
 dependencies = [
  "async-compression",
  "bincode",
