@@ -1,10 +1,8 @@
-use media_analyzer::media_analyzer::MediaAnalyzer;
+use media_analyzer::MediaAnalyzer;
 use std::path::Path;
 // TODO: make rust package
 // add error handling
-// Reverse geolocation
-// add gps accuracy to gpsInfo
-// add bearing/movement speed to gpsInfo
+// add more tests
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {

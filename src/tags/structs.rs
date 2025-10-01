@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-/// Tags, such as is_panorama, is_motion_photo, is_night_sight.
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TagData {

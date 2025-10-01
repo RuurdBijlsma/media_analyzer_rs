@@ -1,5 +1,5 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use media_analyzer::media_analyzer::MediaAnalyzer;
+use media_analyzer::MediaAnalyzer;
 use std::path::Path;
 use tokio::runtime::Runtime;
 

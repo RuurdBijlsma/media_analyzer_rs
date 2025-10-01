@@ -21,7 +21,7 @@
 //!
 //! ```rust,no_run
 //! use std::path::Path;
-//! use media_analyzer::media_analyzer::MediaAnalyzer;
+//! use media_analyzer::MediaAnalyzer;
 //!
 //! #[tokio::main]
 //! async fn main() -> color_eyre::Result<()> {//!
@@ -41,9 +41,21 @@
 //! }
 //! ```
 
-pub mod media_analyzer;
-pub mod other;
-pub mod structs;
-pub mod tags;
-pub mod time;
-pub mod utils;
+mod media_analyzer;
+mod other;
+mod structs;
+mod tags;
+mod time;
+
+pub use media_analyzer::MediaAnalyzer;
+pub use media_analyzer::MediaAnalyzerBuilder;
+pub use other::gps::GpsInfo;
+pub use other::metadata::CaptureDetails;
+pub use other::metadata::FileMetadata;
+pub use other::pano::PanoInfo;
+pub use other::pano::PanoViewInfo;
+pub use other::weather::SunInfo;
+pub use other::weather::WeatherInfo;
+pub use structs::AnalyzeResult;
+pub use tags::structs::TagData;
+pub use time::structs::TimeInfo;

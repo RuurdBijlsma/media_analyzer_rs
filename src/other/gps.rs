@@ -1,6 +1,33 @@
-use crate::other::structs::{GpsInfo, LocationName};
 use reverse_geocoder::ReverseGeocoder;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub enum DirectionRef {
+    TrueNorth,
+    MagneticNorth,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct GpsInfo {
+    pub latitude: f64,
+    pub longitude: f64,
+    pub altitude: Option<f64>,
+    pub location: LocationName,
+    pub image_direction: Option<f64>,
+    pub image_direction_ref: Option<DirectionRef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct LocationName {
+    pub latitude: f64,
+    pub longitude: f64,
+    pub name: String,
+    pub admin1: String,
+    pub admin2: String,
+    pub country_code: String,
+    pub country_name: Option<String>,
+}
 
 pub async fn get_gps_info(geocoder: &ReverseGeocoder, numeric_exif: &Value) -> Option<GpsInfo> {
     let (latitude, longitude) = match (
@@ -11,6 +38,15 @@ pub async fn get_gps_info(geocoder: &ReverseGeocoder, numeric_exif: &Value) -> O
         _ => return None,
     };
     let altitude = numeric_exif.get("GPSAltitude").and_then(Value::as_f64);
+    let image_direction = numeric_exif.get("GPSImgDirection").and_then(Value::as_f64);
+    let image_direction_ref = numeric_exif
+        .get("GPSImgDirectionRef")
+        .and_then(Value::as_str)
+        .and_then(|s| match s {
+            "T" => Some(DirectionRef::TrueNorth),
+            "M" => Some(DirectionRef::MagneticNorth),
+            _ => None,
+        });
 
     let search_result = geocoder.search((latitude, longitude));
     let country_name = rust_iso3166::from_alpha2(&search_result.record.cc);
@@ -30,5 +66,7 @@ pub async fn get_gps_info(geocoder: &ReverseGeocoder, numeric_exif: &Value) -> O
         longitude,
         altitude,
         location,
+        image_direction,
+        image_direction_ref,
     })
 }

@@ -98,7 +98,7 @@ impl MediaAnalyzer {
 
         let numeric_exif = self.exiftool.json(media_file, &["-n"])?;
 
-        let metadata = get_metadata(&numeric_exif)?;
+        let (metadata, capture_details) = get_metadata(&numeric_exif)?;
         let tags = extract_tags(media_file, &numeric_exif);
         let gps_info = get_gps_info(&self.geocoder, &numeric_exif).await;
         let time_info = get_time_info(&exif_info, gps_info.as_ref());
@@ -123,6 +123,7 @@ impl MediaAnalyzer {
             pano_info,
             data_url,
             metadata,
+            capture_details,
         })
     }
 }

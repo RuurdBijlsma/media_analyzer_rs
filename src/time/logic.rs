@@ -1,7 +1,7 @@
 //! Core logic for determining the best time representation based on extracted components.
 
 use super::extraction::{ExtractedTimeComponents, extract_time_components, get_string_field};
-use crate::other::structs::GpsInfo;
+use crate::other::gps::GpsInfo;
 use crate::time::structs::{
     CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, SourceDetails, TimeInfo, TimeZoneInfo,
 };

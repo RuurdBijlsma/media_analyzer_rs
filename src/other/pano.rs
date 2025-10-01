@@ -1,6 +1,26 @@
-use crate::other::structs::{PanoInfo, PanoViewInfo};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::Path;
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct PanoInfo {
+    pub use_panorama_viewer: bool,
+    pub is_photosphere: bool,
+    pub view_info: Option<PanoViewInfo>,
+    pub projection_type: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct PanoViewInfo {
+    /// The calculated horizontal field of view in degrees.
+    pub horizontal_fov_deg: f64,
+    /// The calculated vertical field of view in degrees.
+    pub vertical_fov_deg: f64,
+    /// The horizontal center of the view in degrees (-180 to 180).
+    pub center_yaw_deg: f64,
+    /// The vertical center of the view in degrees (-90 to 90).
+    pub center_pitch_deg: f64,
+}
 
 pub fn get_pano_info(file_path: &Path, exif: &Value) -> PanoInfo {
     let filename_lower = file_path

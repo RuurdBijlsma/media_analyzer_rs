@@ -1,8 +1,24 @@
-use crate::other::structs::{GpsInfo, SunInfo, WeatherInfo};
+use crate::other::gps::GpsInfo;
 use chrono::{DateTime, Utc};
 use meteostat::RequiredData::SpecificDate;
-use meteostat::{LatLon, Meteostat};
+use meteostat::{Hourly, LatLon, Meteostat};
+use serde::{Deserialize, Serialize};
 use sunrise::{Coordinates, DawnType, SolarDay, SolarEvent};
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct WeatherInfo {
+    pub hourly: Option<Hourly>,
+    pub sun_info: SunInfo,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SunInfo {
+    pub sunrise: DateTime<Utc>,
+    pub sunset: DateTime<Utc>,
+    pub dawn: DateTime<Utc>,
+    pub dusk: DateTime<Utc>,
+    pub is_daytime: bool,
+}
 
 fn compute_sun_info(datetime: DateTime<Utc>, gps_info: &GpsInfo) -> Option<SunInfo> {
     let date = datetime.date_naive();
