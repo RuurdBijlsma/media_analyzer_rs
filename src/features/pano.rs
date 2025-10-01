@@ -130,35 +130,146 @@ pub fn parse_partial_pano_info(exif: &Value) -> Option<PanoViewInfo> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::MediaAnalyzerError;
-    use exiftool::ExifTool;
+    use serde_json::json;
     use std::path::Path;
 
+    // --- Tests for the main `get_pano_info` function ---
+
     #[test]
-    fn test_photosphere() -> Result<(), MediaAnalyzerError> {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("assets")
-            .join("photosphere.jpg");
+    fn test_full_photosphere_from_exif() {
+        // Simulates a standard photosphere with minimal EXIF, forcing the "default to full sphere" logic.
+        let path = Path::new("photosphere.jpg");
+        let exif_data = json!({
+            "ProjectionType": "equirectangular"
+        });
 
-        let mut et = ExifTool::new()?;
-        let exif_data = et.json(&path, &["-n"])?;
+        let pano_info = get_pano_info(path, &exif_data);
 
-        let pano_info = get_pano_info(&path, &exif_data);
         assert!(
             pano_info.is_photosphere,
-            "Should be detected as a photosphere"
+            "Should be a photosphere by default"
+        );
+        assert!(pano_info.use_panorama_viewer, "Should use panorama viewer");
+        assert_eq!(
+            pano_info.projection_type,
+            Some("equirectangular".to_string())
+        );
+
+        // Check that it correctly defaulted to a full 360x180 view
+        let view_info = pano_info.view_info.unwrap();
+        assert_eq!(view_info.horizontal_fov_deg, 360.0);
+        assert_eq!(view_info.vertical_fov_deg, 180.0);
+    }
+
+    #[test]
+    fn test_partial_equirectangular_pano_from_exif() {
+        // Simulates a detailed partial panorama. This is the most complex case.
+        let path = Path::new("partial_pano.jpg");
+        let exif_data = json!({
+            "ProjectionType": "equirectangular",
+            "FullPanoWidthPixels": 8192,
+            "FullPanoHeightPixels": 4096,
+            "CroppedAreaImageWidthPixels": 4096, // Exactly half the width
+            "CroppedAreaImageHeightPixels": 2048, // Exactly half the height
+            "CroppedAreaLeftPixels": 2048, // Starts 1/4 of the way in
+            "CroppedAreaTopPixels": 1024 // Starts 1/4 of the way down
+        });
+
+        let pano_info = get_pano_info(path, &exif_data);
+
+        assert!(
+            !pano_info.is_photosphere,
+            "A partial pano should not be a photosphere"
         );
         assert!(
             pano_info.use_panorama_viewer,
-            "Should require a panorama viewer"
+            "Should still use a panorama viewer"
         );
         assert_eq!(
             pano_info.projection_type,
-            Some("equirectangular".to_string()),
-            "Projection type should be equirectangular"
+            Some("equirectangular".to_string())
         );
-        assert!(pano_info.view_info.is_some());
 
-        Ok(())
+        let view_info = pano_info
+            .view_info
+            .expect("Should have view info for partial pano");
+
+        // --- Verify the calculations from parse_partial_pano_info ---
+        // Horizontal FOV should be (4096 / 8192) * 360 = 180 degrees
+        assert!((view_info.horizontal_fov_deg - 180.0).abs() < 1e-9);
+        // Vertical FOV should be (2048 / 4096) * 180 = 90 degrees
+        assert!((view_info.vertical_fov_deg - 90.0).abs() < 1e-9);
+        // Center Yaw should be ((2048 + 4096/2) / 8192 - 0.5) * 360 = 0 degrees (centered horizontally)
+        assert!((view_info.center_yaw_deg - 0.0).abs() < 1e-9);
+        // Center Pitch should be ((1024 + 2048/2) / 4096 - 0.5) * -180 = 0 degrees (centered vertically)
+        assert!((view_info.center_pitch_deg - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_filename_triggers_viewer_without_exif() {
+        // Test that the filename check works independently of EXIF data.
+        let path = Path::new("some_image.pano.jpg");
+        let exif_data = json!({}); // No pano EXIF tags
+
+        let pano_info = get_pano_info(path, &exif_data);
+
+        assert!(
+            pano_info.use_panorama_viewer,
+            "Filename '.pano.' should trigger viewer"
+        );
+        // Ensure other fields are correctly false/None
+        assert!(!pano_info.is_photosphere);
+        assert!(pano_info.projection_type.is_none());
+        assert!(pano_info.view_info.is_none());
+    }
+
+    #[test]
+    fn test_regular_image_is_not_a_pano() {
+        // Test the most common case: a standard image.
+        let path = Path::new("sunset.jpg");
+        let exif_data = json!({}); // Empty EXIF
+
+        let pano_info = get_pano_info(path, &exif_data);
+
+        assert!(!pano_info.use_panorama_viewer);
+        assert!(!pano_info.is_photosphere);
+        assert!(pano_info.projection_type.is_none());
+        assert!(pano_info.view_info.is_none());
+    }
+
+    // --- Tests specifically for the `parse_partial_pano_info` helper function ---
+
+    #[test]
+    fn test_parse_partial_fails_if_tag_is_missing() {
+        // This JSON is missing "FullPanoHeightPixels"
+        let incomplete_exif = json!({
+            "FullPanoWidthPixels": 8192,
+            "CroppedAreaImageWidthPixels": 4096,
+            "CroppedAreaImageHeightPixels": 2048,
+            "CroppedAreaLeftPixels": 2048,
+            "CroppedAreaTopPixels": 1024
+        });
+        let result = parse_partial_pano_info(&incomplete_exif);
+        assert!(
+            result.is_none(),
+            "Should fail gracefully if a required tag is missing"
+        );
+    }
+
+    #[test]
+    fn test_parse_partial_fails_on_division_by_zero() {
+        let zero_width_exif = json!({
+            "FullPanoWidthPixels": 0, // This would cause a division by zero
+            "FullPanoHeightPixels": 4096,
+            "CroppedAreaImageWidthPixels": 4096,
+            "CroppedAreaImageHeightPixels": 2048,
+            "CroppedAreaLeftPixels": 2048,
+            "CroppedAreaTopPixels": 1024
+        });
+        let result = parse_partial_pano_info(&zero_width_exif);
+        assert!(
+            result.is_none(),
+            "Should fail gracefully on potential division by zero"
+        );
     }
 }

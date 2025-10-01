@@ -275,3 +275,196 @@ fn apply_priority_logic(
 
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::MediaAnalyzerError;
+    use crate::features::gps::{GpsInfo, LocationName};
+    use chrono::{FixedOffset, NaiveDate};
+    use exiftool::ExifTool;
+    use std::path::Path;
+
+    // --- UNIT TESTS (Mocked data, focused on priority logic) ---
+
+    #[test]
+    fn test_priority_6_naive_only() -> Result<(), MediaAnalyzerError> {
+        // Test the simplest case: only a naive datetime is available.
+        let components = ExtractedTimeComponents {
+            best_naive: Some((
+                NaiveDate::from_ymd_opt(2023, 1, 1)
+                    .unwrap()
+                    .and_hms_opt(12, 0, 0)
+                    .unwrap(),
+                "DateTimeOriginal".to_string(),
+            )),
+            potential_utc: None,
+            potential_explicit_offset: None,
+            potential_file_dt: None,
+        };
+        let time_info = apply_priority_logic(components, None, &serde_json::Value::Null).unwrap();
+        assert_eq!(time_info.source_details.confidence, CONFIDENCE_LOW);
+        assert_eq!(time_info.source_details.time_source, "DateTimeOriginal");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_priority_5_naive_with_guessed_offset() -> Result<(), MediaAnalyzerError> {
+        // Test that it correctly uses the file modification date to guess an offset.
+        let components = ExtractedTimeComponents {
+            best_naive: Some((
+                NaiveDate::from_ymd_opt(2023, 1, 1)
+                    .unwrap()
+                    .and_hms_opt(12, 0, 0)
+                    .unwrap(),
+                "CreateDate".to_string(),
+            )),
+            potential_utc: None,
+            potential_explicit_offset: None,
+            potential_file_dt: Some((
+                FixedOffset::east_opt(2 * 3600)
+                    .unwrap()
+                    .with_ymd_and_hms(2023, 1, 1, 14, 0, 0)
+                    .unwrap(),
+                "FileModifyDate".to_string(),
+            )),
+        };
+        let time_info = apply_priority_logic(components, None, &serde_json::Value::Null).unwrap();
+        assert_eq!(time_info.source_details.confidence, CONFIDENCE_MEDIUM);
+        let tz = time_info.timezone.unwrap();
+        assert_eq!(tz.offset_seconds, 2 * 3600);
+        assert_eq!(tz.source, "Guessed from FileModifyDate");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_priority_3_fixed_offset() -> Result<(), MediaAnalyzerError> {
+        // Test that an explicit offset tag is preferred over a guessed offset.
+        let components = ExtractedTimeComponents {
+            best_naive: Some((
+                NaiveDate::from_ymd_opt(2024, 1, 1)
+                    .unwrap()
+                    .and_hms_opt(10, 0, 0)
+                    .unwrap(),
+                "DateTimeOriginal".to_string(),
+            )),
+            potential_utc: None,
+            potential_explicit_offset: Some((
+                -5 * 3600,
+                "-05:00".to_string(),
+                "OffsetTime".to_string(),
+            )),
+            potential_file_dt: Some((
+                // This lower-priority data should be ignored
+                FixedOffset::east_opt(2 * 3600)
+                    .unwrap()
+                    .with_ymd_and_hms(2024, 1, 1, 12, 0, 0)
+                    .unwrap(),
+                "FileModifyDate".to_string(),
+            )),
+        };
+        let time_info = apply_priority_logic(components, None, &serde_json::Value::Null).unwrap();
+        assert_eq!(time_info.source_details.confidence, CONFIDENCE_HIGH);
+        assert_eq!(time_info.timezone.unwrap().source, "OffsetTime");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_priority_2_zoned_time_with_gps() -> Result<(), MediaAnalyzerError> {
+        // Test that GPS location correctly determines the IANA timezone. (Amsterdam case)
+        let amsterdam_gps = GpsInfo {
+            latitude: 52.379189,
+            longitude: 4.899431,
+            altitude: None,
+            location: LocationName {
+                latitude: 52.37,
+                longitude: 4.89,
+                name: "Amsterdam".to_string(),
+                admin1: "".to_string(),
+                admin2: "".to_string(),
+                country_code: "NL".to_string(),
+                country_name: None,
+            },
+            image_direction: None,
+            image_direction_ref: None,
+        };
+        let components = ExtractedTimeComponents {
+            best_naive: Some((
+                NaiveDate::from_ymd_opt(2024, 7, 1)
+                    .unwrap()
+                    .and_hms_opt(15, 0, 0)
+                    .unwrap(), // 3 PM in summer
+                "DateTimeOriginal".to_string(),
+            )),
+            potential_utc: None,
+            potential_explicit_offset: None,
+            potential_file_dt: None,
+        };
+        let time_info =
+            apply_priority_logic(components, Some(&amsterdam_gps), &serde_json::Value::Null)
+                .unwrap();
+        assert_eq!(time_info.source_details.confidence, CONFIDENCE_HIGH);
+        let tz = time_info.timezone.unwrap();
+        assert_eq!(tz.name, "Europe/Amsterdam");
+        assert_eq!(
+            tz.offset_seconds,
+            2 * 3600,
+            "Amsterdam is UTC+2 in summer (DST)"
+        );
+
+        Ok(())
+    }
+
+    // --- INTEGRATION TESTS (Using real asset files with the correct `-g2` flag) ---
+
+    /// Helper that runs exiftool with the `-g2` flag, which is specifically
+    /// required by the time extraction logic.
+    fn get_g2_exif_for_asset(relative_path: &str) -> Result<Value, MediaAnalyzerError> {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("assets")
+            .join(relative_path);
+        let mut et = ExifTool::new()?;
+        // The `-g2` flag provides the grouped JSON structure this module expects.
+        Ok(et.json(&path, &["-g2"])?)
+    }
+
+    #[test]
+    fn test_real_life_photo() -> Result<(), MediaAnalyzerError> {
+        // This burst photo has a timestamp in its filename but lacks high-quality EXIF date tags.
+        let exif_data = get_g2_exif_for_asset("burst/20150813_160421_Burst01.jpg")?;
+        let time_info = get_time_info(&exif_data, None)?;
+
+        assert_eq!(time_info.source_details.confidence, CONFIDENCE_HIGH);
+        assert_eq!(time_info.source_details.time_source, "GPSDateTime");
+        assert!(time_info.datetime_utc.is_some());
+        assert_eq!(
+            time_info.datetime_naive,
+            NaiveDate::from_ymd_opt(2015, 8, 13)
+                .unwrap()
+                .and_hms_opt(14, 5, 18)
+                .unwrap()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_real_file_filemodifydate_priority_8() -> Result<(), MediaAnalyzerError> {
+        // A text file has no EXIF or filename time, so it must fall back to the filesystem's modify date.
+        let exif_data = get_g2_exif_for_asset("text_file.txt")?;
+        let time_info = get_time_info(&exif_data, None)?;
+
+        assert_eq!(time_info.source_details.confidence, CONFIDENCE_LOW);
+        // The source is just the tag name, as extracted.
+        assert_eq!(time_info.source_details.time_source, "FileModifyDate");
+        assert!(
+            time_info.datetime_utc.is_some(),
+            "FileModifyDate includes an offset, so UTC can be calculated"
+        );
+
+        Ok(())
+    }
+}

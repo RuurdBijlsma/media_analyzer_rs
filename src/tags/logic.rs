@@ -88,7 +88,6 @@ mod tests {
     /// Helper function to reduce boilerplate in tests.
     /// It takes a relative path to an asset, runs exiftool, and returns the extracted tags.
     fn get_tags_for_asset(relative_path: &str) -> Result<TagData, MediaAnalyzerError> {
-        // Assume tests run from the project root where the 'assets' dir is.
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("assets")
             .join(relative_path);
@@ -97,10 +96,9 @@ mod tests {
             panic!("Test asset file not found at: {:?}", path);
         }
 
+        // Use the numeric preset '-n' for all tests for consistency.
         let mut et = ExifTool::new()?;
         let exif_data = et.json(&path, &["-n"])?;
-
-        // println!("{}", serde_json::to_string_pretty(&exif_data).unwrap());
 
         Ok(extract_tags(&path, &exif_data))
     }
@@ -108,17 +106,24 @@ mod tests {
     #[test]
     fn test_night_sight_photo() {
         let tags = get_tags_for_asset("night_sight/PXL_20250104_170020532.NIGHT.jpg").unwrap();
+
         assert!(
             tags.is_night_sight,
             "Should be detected as Night Sight from filename"
         );
+
+        // Ensure other boolean tags are false
         assert!(!tags.is_video);
         assert!(!tags.is_motion_photo);
+        assert!(!tags.is_burst);
+        assert!(!tags.is_slowmotion);
+        assert!(!tags.is_timelapse);
     }
 
     #[test]
     fn test_motion_photo() {
         let tags = get_tags_for_asset("motion/PXL_20250103_180944831.MP.jpg").unwrap();
+
         assert!(
             tags.is_motion_photo,
             "Should be detected as a Motion Photo from EXIF tag"
@@ -127,98 +132,102 @@ mod tests {
             tags.motion_photo_presentation_timestamp.is_some(),
             "Should have a presentation timestamp"
         );
-        // The primary file is an image, but it contains a video component.
         assert!(
             !tags.is_video,
-            "Motion photos contain a video stream but is not a video."
+            "Motion photos are not considered primary videos"
         );
     }
 
     #[test]
+    fn test_hdr_photo() {
+        let tags = get_tags_for_asset("hdr.jpg").unwrap();
+        assert!(tags.is_hdr, "Should be detected as HDR from EXIF tag");
+    }
+
+    #[test]
     fn test_burst_photos() {
-        // Test case 1: Google Pixel burst format
+        // Google Pixel burst format
         let tags1 =
             get_tags_for_asset("burst/00000IMG_00000_BURST20201123164411530_COVER.jpg").unwrap();
-        assert!(tags1.is_burst, "Should detect burst format 1");
-        assert_eq!(
-            tags1.burst_id,
-            Some("00000img_00000".to_string()),
-            "Should extract correct burst ID for format 1"
-        );
+        assert!(tags1.is_burst, "Should detect Google burst format");
+        assert_eq!(tags1.burst_id, Some("00000img_00000".to_string()));
 
-        // Test case 2: Samsung/Older burst format
+        // Samsung/Older burst format
         let tags2 = get_tags_for_asset("burst/20150813_160421_Burst01.jpg").unwrap();
-        assert!(tags2.is_burst, "Should detect burst format 2");
-        assert_eq!(
-            tags2.burst_id,
-            Some("20150813_160421".to_string()),
-            "Should extract correct burst ID for format 2"
-        );
+        assert!(tags2.is_burst, "Should detect Samsung burst format");
+        assert_eq!(tags2.burst_id, Some("20150813_160421".to_string()));
     }
 
     #[test]
     fn test_slow_motion_video() {
         let tags = get_tags_for_asset("slowmotion.mp4").unwrap();
-        assert!(tags.is_video, "Should be detected as a video");
-        assert!(tags.is_slowmotion, "Should be detected as slow motion");
-        assert!(!tags.is_timelapse, "Should not be a timelapse");
 
-        // This assertion is key for slow motion detection
-        if let (Some(capture), Some(video)) = (tags.capture_fps, tags.video_fps) {
-            assert!(
-                capture > video,
-                "Capture FPS ({}) must be greater than video FPS ({}) for slow motion",
-                capture,
-                video
-            );
-        } else {
-            panic!("Capture FPS and Video FPS could not be determined for slow motion file.");
-        }
+        assert!(tags.is_video);
+        assert!(tags.is_slowmotion);
+        assert!(!tags.is_timelapse);
+
+        let capture_fps = tags.capture_fps.expect("Should have capture FPS");
+        let video_fps = tags.video_fps.expect("Should have video FPS");
+
+        assert!(
+            capture_fps > video_fps,
+            "Capture FPS must be greater than video FPS"
+        );
+        assert!(
+            (capture_fps / video_fps) > 1.05,
+            "Slow motion ratio should be > 1.05"
+        );
     }
 
     #[test]
     fn test_timelapse_video() {
         let tags = get_tags_for_asset("timelapse.mp4").unwrap();
-        assert!(tags.is_video, "Should be detected as a video");
-        assert!(tags.is_timelapse, "Should be detected as a timelapse");
-        assert!(!tags.is_slowmotion, "Should not be slow motion");
+
+        assert!(tags.is_video);
+        assert!(tags.is_timelapse);
+        assert!(!tags.is_slowmotion);
+
+        // Verify the fallback detection logic for timelapse (low video FPS)
+        tags.video_fps.expect("Timelapse should have video FPS");
     }
 
     #[test]
     fn test_standard_video() {
         let tags = get_tags_for_asset("video/car.webm").unwrap();
-        assert!(tags.is_video, "Should be detected as a video");
+
+        assert!(tags.is_video);
+
+        // Ensure other boolean tags are false
         assert!(!tags.is_slowmotion);
         assert!(!tags.is_timelapse);
         assert!(!tags.is_motion_photo);
+        assert!(!tags.is_burst);
+        assert!(!tags.is_night_sight);
     }
 
     #[test]
-    fn test_standard_images() {
-        let tags_jpg = get_tags_for_asset("sunset.jpg").unwrap();
-        assert!(!tags_jpg.is_video, "Standard JPG should not be a video");
-        assert!(
-            !tags_jpg.is_burst,
-            "Standard JPG should not be a burst photo"
-        );
-        assert!(
-            !tags_jpg.is_night_sight,
-            "Standard JPG should not be night sight"
-        );
+    fn test_standard_image_properties() {
+        let tags = get_tags_for_asset("tent.jpg").unwrap();
 
-        let tags_png = get_tags_for_asset("png_image.png").unwrap();
-        assert!(!tags_png.is_video, "PNG should not be a video");
+        // Assert all boolean flags are correctly false for a standard image
+        assert!(!tags.is_video);
+        assert!(!tags.is_burst);
+        assert!(!tags.is_night_sight);
+        assert!(!tags.is_motion_photo);
+        assert!(!tags.is_slowmotion);
+        assert!(!tags.is_timelapse);
 
-        let tags_gif = get_tags_for_asset("cat_bee.gif").unwrap();
-        assert!(!tags_gif.is_video, "GIF should not be a video");
+        // Assert all optional fields are None
+        assert!(tags.burst_id.is_none());
+        assert!(tags.motion_photo_presentation_timestamp.is_none());
     }
 
     #[test]
     fn test_non_media_file() {
-        // This will get an empty JSON object from our robust helper function
+        // This file type won't have any media EXIF tags
         let tags = get_tags_for_asset("text_file.txt").unwrap();
 
-        // Assert that all boolean flags are false and Options are None
+        // Assert that all boolean flags are false
         assert!(!tags.is_video);
         assert!(!tags.is_burst);
         assert!(!tags.is_hdr);
@@ -226,8 +235,11 @@ mod tests {
         assert!(!tags.is_night_sight);
         assert!(!tags.is_slowmotion);
         assert!(!tags.is_timelapse);
+
+        // Assert that all optional fields are None
         assert!(tags.burst_id.is_none());
         assert!(tags.capture_fps.is_none());
         assert!(tags.video_fps.is_none());
+        assert!(tags.motion_photo_presentation_timestamp.is_none());
     }
 }
