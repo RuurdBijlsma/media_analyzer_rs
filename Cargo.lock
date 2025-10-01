@@ -2049,6 +2049,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sunrise",
+ "thiserror 2.0.16",
  "tokio",
  "tzf-rs",
  "walkdir",

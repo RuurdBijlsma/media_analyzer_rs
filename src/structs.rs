@@ -1,9 +1,6 @@
-use crate::other::gps::GpsInfo;
-use crate::other::metadata::{CaptureDetails, FileMetadata};
-use crate::other::pano::PanoInfo;
-use crate::other::weather::WeatherInfo;
 use crate::tags::structs::TagData;
 use crate::time::structs::TimeInfo;
+use crate::{CaptureDetails, FileMetadata, GpsInfo, PanoInfo, WeatherInfo};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

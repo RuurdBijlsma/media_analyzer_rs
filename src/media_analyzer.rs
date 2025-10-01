@@ -1,13 +1,13 @@
-use crate::other::data_url::file_to_data_url;
-use crate::other::gps::get_gps_info;
-use crate::other::metadata::get_metadata;
-use crate::other::pano::get_pano_info;
-use crate::other::weather::get_weather_info;
+use crate::features::data_url::file_to_data_url;
+use crate::features::gps::get_gps_info;
+use crate::features::metadata::get_metadata;
+use crate::features::pano::get_pano_info;
+use crate::features::weather::get_weather_info;
 use crate::structs::AnalyzeResult;
 use crate::tags::logic::extract_tags;
 use crate::time::get_time_info;
+use crate::MediaAnalyzerError;
 use bon::bon;
-use color_eyre::eyre::eyre;
 use exiftool::ExifTool;
 use meteostat::Meteostat;
 use reverse_geocoder::ReverseGeocoder;
@@ -39,13 +39,13 @@ impl MediaAnalyzer {
     pub async fn new(
         exiftool_path: Option<PathBuf>,
         cache_folder: Option<PathBuf>,
-    ) -> color_eyre::Result<Self> {
+    ) -> Result<Self, MediaAnalyzerError> {
         let exiftool = match exiftool_path {
-            Some(exiftool_path) => ExifTool::with_executable(&exiftool_path)?,
+            Some(path) => ExifTool::with_executable(&path)?,
             None => ExifTool::new()?,
         };
         let meteostat = match cache_folder {
-            Some(cache_folder) => Meteostat::with_cache_folder(cache_folder).await?,
+            Some(path) => Meteostat::with_cache_folder(path).await?,
             None => Meteostat::new().await?,
         };
         let geocoder = ReverseGeocoder::new();
@@ -89,30 +89,30 @@ impl MediaAnalyzer {
         &mut self,
         media_file: &Path,
         frames: Vec<&Path>,
-    ) -> color_eyre::Result<AnalyzeResult> {
-        let thumbnail_path = frames.first().ok_or(eyre!("No thumbnail frames"))?;
-        // Slow in general:
+    ) -> Result<AnalyzeResult, MediaAnalyzerError> {
+        // Return our crate's Error
+        let thumbnail_path = frames.first().ok_or(MediaAnalyzerError::NoThumbnail)?;
         let data_url = file_to_data_url(thumbnail_path)?;
 
         let exif_info = self.exiftool.json(media_file, &["-g2"])?;
-
         let numeric_exif = self.exiftool.json(media_file, &["-n"])?;
 
         let (metadata, capture_details) = get_metadata(&numeric_exif)?;
         let tags = extract_tags(media_file, &numeric_exif);
         let gps_info = get_gps_info(&self.geocoder, &numeric_exif).await;
-        let time_info = get_time_info(&exif_info, gps_info.as_ref());
         let pano_info = get_pano_info(media_file, &numeric_exif);
 
-        // Slow if not cached:
-        let weather_info = match gps_info {
-            Some(ref gps) => {
-                get_weather_info(&self.meteostat, gps, time_info.datetime_utc.unwrap())
-                    .await
-                    .ok()
-            }
-            None => None,
-        };
+        // This is now fallible, so we use '?'
+        let time_info = get_time_info(&exif_info, gps_info.as_ref())?;
+
+        // Get weather info only if we have both GPS and a valid UTC time.
+        // We use .ok() to treat weather as "best-effort" and not fail the whole analysis.
+        let weather_info =
+            if let (Some(gps), Some(utc_time)) = (gps_info.as_ref(), time_info.datetime_utc) {
+                get_weather_info(&self.meteostat, gps, utc_time).await.ok()
+            } else {
+                None
+            };
 
         Ok(AnalyzeResult {
             exif: exif_info,

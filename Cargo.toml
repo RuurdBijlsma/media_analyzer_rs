@@ -40,6 +40,7 @@ image = "0.25.8"
 sunrise = "2.1.0"
 reverse_geocoder = "4.1.1"
 rust_iso3166 = "0.1.14"
+thiserror = "2.0.16"
 
 
 [dev-dependencies]

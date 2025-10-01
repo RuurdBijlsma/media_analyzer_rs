@@ -41,21 +41,25 @@
 //! }
 //! ```
 
+mod error;
+mod features;
 mod media_analyzer;
-mod other;
 mod structs;
 mod tags;
 mod time;
 
+// --- Public API Exports ---
 pub use media_analyzer::MediaAnalyzer;
 pub use media_analyzer::MediaAnalyzerBuilder;
-pub use other::gps::GpsInfo;
-pub use other::metadata::CaptureDetails;
-pub use other::metadata::FileMetadata;
-pub use other::pano::PanoInfo;
-pub use other::pano::PanoViewInfo;
-pub use other::weather::SunInfo;
-pub use other::weather::WeatherInfo;
+
+// The primary error type
+pub use error::MediaAnalyzerError;
+
+// The data structures for easy access
+pub use features::gps::GpsInfo;
+pub use features::metadata::{CaptureDetails, FileMetadata};
+pub use features::pano::{PanoInfo, PanoViewInfo};
+pub use features::weather::{SunInfo, WeatherInfo};
 pub use structs::AnalyzeResult;
 pub use tags::structs::TagData;
 pub use time::structs::TimeInfo;

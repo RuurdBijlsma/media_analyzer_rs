@@ -1,7 +1,8 @@
 //! Core logic for determining the best time representation based on extracted components.
 
+use super::error::TimeError;
 use super::extraction::{ExtractedTimeComponents, extract_time_components, get_string_field};
-use crate::other::gps::GpsInfo;
+use crate::GpsInfo;
 use crate::time::structs::{
     CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, SourceDetails, TimeInfo, TimeZoneInfo,
 };
@@ -22,25 +23,16 @@ const MAX_NAIVE_GPS_DIFF_SECONDS: i64 = 10;
 static FINDER: Lazy<DefaultFinder> = Lazy::new(DefaultFinder::new);
 
 /// Main entry point function - Extracts and processes time info.
-pub fn get_time_info(exif_info: &Value, gps_info: Option<&GpsInfo>) -> TimeInfo {
+///
+/// Returns a `Result` which is `Ok(TimeInfo)` on success or an `Err(TimeError)`
+/// if no usable time information could be extracted from any source.
+pub fn get_time_info(exif_info: &Value, gps_info: Option<&GpsInfo>) -> Result<TimeInfo, TimeError> {
     let components = extract_time_components(exif_info);
     let time_result = apply_priority_logic(components, gps_info, exif_info);
 
-    time_result.unwrap_or_else(|| {
-        let dummy_datetime = NaiveDate::from_ymd_opt(1970, 1, 1)
-            .expect("01-01-1970 is a valid date.")
-            .and_hms_opt(0, 0, 0)
-            .expect("01-01-1970 00:00:00 is a valid datetime.");
-        TimeInfo {
-            datetime_utc: None,
-            source_details: SourceDetails {
-                time_source: "Error".to_string(),
-                confidence: "Error".to_string(),
-            },
-            datetime_naive: dummy_datetime,
-            timezone: None,
-        }
-    })
+    // If apply_priority_logic returns None, map it to our custom Extraction error.
+    // This replaces the previous `unwrap_or_else` block that created a dummy/error TimeInfo.
+    time_result.ok_or(TimeError::Extraction)
 }
 
 /// Applies the priority logic to extracted components and constructs the final TimeInfo.
