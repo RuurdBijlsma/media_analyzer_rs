@@ -67,8 +67,7 @@ async fn main() -> Result<(), MediaAnalyzerError> {
     let all_files = list_files_walkdir_filtered(start_dir, false).unwrap();
     let sample_size = 1;
     let mut rng_machine = rng();
-    let sampled_files_iter =
-        all_files.sample(&mut rng_machine, sample_size.min(all_files.len()));
+    let sampled_files_iter = all_files.sample(&mut rng_machine, sample_size.min(all_files.len()));
 
     // Iterate over the sampled files
     for file in sampled_files_iter {

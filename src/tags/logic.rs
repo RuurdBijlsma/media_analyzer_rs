@@ -81,13 +81,13 @@ pub fn extract_tags(path: &Path, exif: &Value) -> TagData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::MediaAnalyzerError;
     use exiftool::ExifTool;
     use std::path::Path;
-    use crate::MediaAnalyzerError;
 
     /// Helper function to reduce boilerplate in tests.
     /// It takes a relative path to an asset, runs exiftool, and returns the extracted tags.
-    fn get_tags_for_asset(relative_path: &str) -> Result<TagData,MediaAnalyzerError> {
+    fn get_tags_for_asset(relative_path: &str) -> Result<TagData, MediaAnalyzerError> {
         // Assume tests run from the project root where the 'assets' dir is.
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("assets")

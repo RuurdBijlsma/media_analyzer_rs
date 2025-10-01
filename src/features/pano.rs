@@ -130,9 +130,9 @@ pub fn parse_partial_pano_info(exif: &Value) -> Option<PanoViewInfo> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::MediaAnalyzerError;
     use exiftool::ExifTool;
     use std::path::Path;
-    use crate::MediaAnalyzerError;
 
     #[test]
     fn test_photosphere() -> Result<(), MediaAnalyzerError> {
