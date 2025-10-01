@@ -13,7 +13,7 @@ raw metadata with intelligent parsing, geolocation, and historical weather data 
 easy-to-use result.
 
 Example output, converted to json,
-viewable [here](https://raw.githubusercontent.com/RuurdBijlsma/media_analyzer_rs/refs/heads/main/.github/example_output/example_output.json).
+viewable [here](https://github.com/RuurdBijlsma/media_analyzer_rs/blob/main/.github/example_output/example_output.json).
 
 ## Prerequisites
 
