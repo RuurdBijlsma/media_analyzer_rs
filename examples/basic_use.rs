@@ -10,7 +10,7 @@ async fn main() -> color_eyre::Result<()> {
 
     let path = Path::new("assets/sunset.jpg");
     let mut analyzer = MediaAnalyzer::builder().build().await?;
-    let analyze_result = analyzer.analyze_media(path, vec![path]).await?;
+    let analyze_result = analyzer.analyze_media(path, path).await?;
     println!("{}", serde_json::to_string_pretty(&analyze_result)?);
 
     Ok(())

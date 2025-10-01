@@ -47,12 +47,13 @@ pub async fn get_weather_info(
     client: &Meteostat,
     gps_info: &GpsInfo,
     datetime: DateTime<Utc>,
+    weather_search_radius_km: f64,
 ) -> Result<WeatherInfo, WeatherError> {
     // The '?' will convert meteostat::Error into our WeatherError::ApiError
     let hourly_call = client
         .hourly()
         .location(LatLon(gps_info.latitude, gps_info.longitude))
-        .max_distance_km(100.)
+        .max_distance_km(weather_search_radius_km)
         .required_data(SpecificDate(datetime.date_naive()))
         .call()
         .await?;

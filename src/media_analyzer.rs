@@ -1,3 +1,4 @@
+use crate::MediaAnalyzerError;
 use crate::features::data_url::file_to_data_url;
 use crate::features::gps::get_gps_info;
 use crate::features::metadata::get_metadata;
@@ -6,7 +7,6 @@ use crate::features::weather::get_weather_info;
 use crate::structs::AnalyzeResult;
 use crate::tags::logic::extract_tags;
 use crate::time::get_time_info;
-use crate::MediaAnalyzerError;
 use bon::bon;
 use exiftool::ExifTool;
 use meteostat::Meteostat;
@@ -17,6 +17,8 @@ pub struct MediaAnalyzer {
     geocoder: ReverseGeocoder,
     exiftool: ExifTool,
     meteostat: Meteostat,
+    weather_search_radius_km: f64,
+    thumbnail_max_size: (u32, u32),
 }
 
 #[bon]
@@ -39,6 +41,8 @@ impl MediaAnalyzer {
     pub async fn new(
         exiftool_path: Option<PathBuf>,
         cache_folder: Option<PathBuf>,
+        #[builder(default = 100.0)] weather_search_radius_km: f64,
+        #[builder(default = (10, 10))] thumbnail_max_size: (u32, u32),
     ) -> Result<Self, MediaAnalyzerError> {
         let exiftool = match exiftool_path {
             Some(path) => ExifTool::with_executable(&path)?,
@@ -53,6 +57,8 @@ impl MediaAnalyzer {
             geocoder,
             exiftool,
             meteostat,
+            weather_search_radius_km,
+            thumbnail_max_size,
         })
     }
 
@@ -88,11 +94,9 @@ impl MediaAnalyzer {
     pub async fn analyze_media(
         &mut self,
         media_file: &Path,
-        frames: Vec<&Path>,
+        thumbnail: &Path,
     ) -> Result<AnalyzeResult, MediaAnalyzerError> {
-        // Return our crate's Error
-        let thumbnail_path = frames.first().ok_or(MediaAnalyzerError::NoThumbnail)?;
-        let data_url = file_to_data_url(thumbnail_path)?;
+        let data_url = file_to_data_url(thumbnail, self.thumbnail_max_size)?;
 
         let exif_info = self.exiftool.json(media_file, &["-g2"])?;
         let numeric_exif = self.exiftool.json(media_file, &["-n"])?;
@@ -109,7 +113,14 @@ impl MediaAnalyzer {
         // We use .ok() to treat weather as "best-effort" and not fail the whole analysis.
         let weather_info =
             if let (Some(gps), Some(utc_time)) = (gps_info.as_ref(), time_info.datetime_utc) {
-                get_weather_info(&self.meteostat, gps, utc_time).await.ok()
+                get_weather_info(
+                    &self.meteostat,
+                    gps,
+                    utc_time,
+                    self.weather_search_radius_km,
+                )
+                .await
+                .ok()
             } else {
                 None
             };

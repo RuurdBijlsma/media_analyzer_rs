@@ -5,7 +5,10 @@ use mime_guess::MimeGuess;
 use std::io::Cursor;
 use std::path::Path;
 
-pub fn file_to_data_url<P: AsRef<Path>>(path: P) -> Result<String, DataUrlError> {
+pub fn file_to_data_url<P: AsRef<Path>>(
+    path: P,
+    thumbnail_max_size: (u32, u32),
+) -> Result<String, DataUrlError> {
     let path = path.as_ref();
     let mime = MimeGuess::from_path(path).first_or_octet_stream();
 
@@ -16,7 +19,7 @@ pub fn file_to_data_url<P: AsRef<Path>>(path: P) -> Result<String, DataUrlError>
 
     // The '?' operator will now work with #[from] to convert errors
     let img = image::open(path)?;
-    let thumbnail = img.thumbnail(10, 10);
+    let thumbnail = img.thumbnail(thumbnail_max_size.0, thumbnail_max_size.1);
     let mut bytes = Cursor::new(Vec::new());
     thumbnail.write_to(&mut bytes, ImageFormat::Jpeg)?;
     let b64 = general_purpose::STANDARD.encode(bytes.into_inner());
@@ -35,7 +38,7 @@ mod tests {
             .join("assets")
             .join("png_image.png");
 
-        let data_url_result = file_to_data_url(&path);
+        let data_url_result = file_to_data_url(&path, (10, 10));
         assert!(
             data_url_result.is_ok(),
             "Should successfully process a valid image"
@@ -60,7 +63,7 @@ mod tests {
             .join("assets")
             .join("text_file.txt");
 
-        let data_url_result = file_to_data_url(&path);
+        let data_url_result = file_to_data_url(&path, (10, 10));
         assert!(
             data_url_result.is_err(),
             "Should return an error for non-image files"
@@ -75,7 +78,7 @@ mod tests {
             .join("assets")
             .join("invalid_image.png");
 
-        let data_url_result = file_to_data_url(&path);
+        let data_url_result = file_to_data_url(&path, (10, 10));
         assert!(
             data_url_result.is_err(),
             "Should return an error for corrupted or invalid image files"

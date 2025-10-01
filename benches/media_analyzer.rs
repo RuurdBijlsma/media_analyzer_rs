@@ -21,7 +21,7 @@ fn bench(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let _ = media_analyzer
-                    .analyze_media(image_path, vec![image_path])
+                    .analyze_media(image_path, image_path)
                     .await
                     .unwrap();
             });
