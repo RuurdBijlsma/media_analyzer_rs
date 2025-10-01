@@ -169,3 +169,145 @@ fn get_number_field(value: &Value, group: &str, field: &str) -> Option<u32> {
         .as_u64()
         .and_then(|n| u32::try_from(n).ok())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::NaiveDate;
+    use serde_json::json;
+
+    #[test]
+    fn test_extracts_nothing_from_empty_json() {
+        let exif = json!({});
+        let components = extract_time_components(&exif);
+
+        assert!(components.best_naive.is_none());
+        assert!(components.potential_utc.is_none());
+        assert!(components.potential_explicit_offset.is_none());
+        assert!(components.potential_file_dt.is_none());
+    }
+
+    #[test]
+    fn test_naive_time_priority_logic() {
+        // CreateDate is lower priority than DateTimeOriginal
+        let exif = json!({
+            "Time": {
+                "CreateDate": "2023:01:01 10:00:00",
+                "DateTimeOriginal": "2024:02:02 12:34:56"
+            }
+        });
+
+        let components = extract_time_components(&exif);
+        assert!(components.best_naive.is_some());
+
+        let (naive_dt, source) = components.best_naive.unwrap();
+        assert_eq!(source, "DateTimeOriginal");
+        assert_eq!(
+            naive_dt,
+            NaiveDate::from_ymd_opt(2024, 2, 2)
+                .unwrap()
+                .and_hms_opt(12, 34, 56)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_naive_time_with_parsed_subseconds() {
+        // Subseconds are part of the string itself
+        let exif = json!({
+            "Time": {
+                "SubSecDateTimeOriginal": "2024:03:03 11:22:33.123"
+            }
+        });
+
+        let components = extract_time_components(&exif);
+        let (naive_dt, source) = components.best_naive.unwrap();
+
+        assert_eq!(source, "SubSecDateTimeOriginal: Parsed SubSeconds");
+        assert_eq!(
+            naive_dt,
+            NaiveDate::from_ymd_opt(2024, 3, 3)
+                .unwrap()
+                .and_hms_micro_opt(11, 22, 33, 123_000)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_naive_time_with_separate_subsecond_field() {
+        // Subseconds are in a separate numeric tag
+        let exif = json!({
+            "Time": {
+                "DateTimeOriginal": "2024:04:04 14:15:16",
+                "SubSecTimeOriginal": 456
+            }
+        });
+
+        let components = extract_time_components(&exif);
+        let (naive_dt, source) = components.best_naive.unwrap();
+
+        // Check that the source name was correctly combined
+        assert_eq!(source, "DateTimeOriginal + SubSecTimeOriginal");
+        assert_eq!(
+            naive_dt,
+            NaiveDate::from_ymd_opt(2024, 4, 4)
+                .unwrap()
+                .and_hms_micro_opt(14, 15, 16, 456_000)
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_utc_time_extraction() {
+        // Primary case: GPSDateTime
+        let exif_gps_dt = json!({
+            "Time": { "GPSDateTime": "2024:05:05 10:00:00Z" }
+        });
+        let components_1 = extract_time_components(&exif_gps_dt);
+        let (utc_dt_1, source_1) = components_1.potential_utc.unwrap();
+        assert_eq!(source_1, "GPSDateTime");
+        assert_eq!(utc_dt_1.to_rfc3339(), "2024-05-05T10:00:00+00:00");
+
+        // Fallback case: GPSDateStamp + GPSTimeStamp
+        let exif_gps_stamps = json!({
+            "Time": {
+                "GPSDateStamp": "2024:06:06",
+                "GPSTimeStamp": "11:22:33"
+            }
+        });
+        let components_2 = extract_time_components(&exif_gps_stamps);
+        let (utc_dt_2, source_2) = components_2.potential_utc.unwrap();
+        assert_eq!(source_2, "GPSDateStamp/GPSTimeStamp");
+        assert_eq!(utc_dt_2.to_rfc3339(), "2024-06-06T11:22:33+00:00");
+    }
+
+    #[test]
+    fn test_offset_and_file_time_priority() {
+        let exif = json!({
+            "Time": {
+                // Offset: Original is highest priority
+                "OffsetTime": "+05:00",
+                "OffsetTimeOriginal": "-04:00",
+
+                // File Time: Modify is highest priority
+                "FileAccessDate": "2023:01:01 10:00:00+01:00",
+                "FileModifyDate": "2024:07:07 15:00:00-07:00"
+            }
+        });
+
+        let components = extract_time_components(&exif);
+
+        // Verify Offset Time
+        assert!(components.potential_explicit_offset.is_some());
+        let (secs, parsed_str, source) = components.potential_explicit_offset.unwrap();
+        assert_eq!(source, "OffsetTimeOriginal");
+        assert_eq!(parsed_str, "-04:00");
+        assert_eq!(secs, -4 * 3600);
+
+        // Verify File Time
+        assert!(components.potential_file_dt.is_some());
+        let (file_dt, file_source) = components.potential_file_dt.unwrap();
+        assert_eq!(file_source, "FileModifyDate");
+        assert_eq!(file_dt.to_rfc3339(), "2024-07-07T15:00:00-07:00");
+    }
+}
