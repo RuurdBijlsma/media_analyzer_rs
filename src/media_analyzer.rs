@@ -191,6 +191,51 @@ impl MediaAnalyzer {
             capture_details,
         })
     }
+
+    /// Analyzes a photo file, using the file itself to generate the thumbnail.
+    ///
+    /// This is a convenience method that calls `analyze_media`, passing the photo's
+    /// path as both the `media_file` and `thumbnail` argument.
+    ///
+    /// # Arguments
+    ///
+    /// * `photo` - A path to the photo file to be analyzed.
+    ///
+    /// # Returns
+    ///
+    /// On success, returns a `Result` containing an [`AnalyzeResult`] struct. See the
+    /// documentation for [`analyze_media`](Self::analyze_media) for a detailed breakdown of the
+    /// returned fields.
+    ///
+    /// # Errors
+    ///
+    /// This function returns the same errors as `analyze_media`. See its documentation
+    /// for details.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use std::path::Path;
+    /// # use media_analyzer::{MediaAnalyzer, MediaAnalyzerError};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), MediaAnalyzerError> {
+    /// let mut analyzer = MediaAnalyzer::builder().build().await?;
+    /// let photo_path = Path::new("assets/tent.jpg");
+    ///
+    /// // Analyze a photo using the convenience method.
+    /// let result = analyzer.analyze_photo(photo_path).await?;
+    ///
+    /// println!("Photo taken in {:?}", result.gps_info.unwrap().location);
+    /// println!("Camera Model: {}", result.capture_details.camera_model.unwrap_or_default());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn analyze_photo(
+        &mut self,
+        photo: &Path,
+    ) -> Result<AnalyzeResult, MediaAnalyzerError> {
+        self.analyze_media(photo, photo).await
+    }
 }
 
 #[cfg(test)]
@@ -222,6 +267,24 @@ mod tests {
         assert!(result.weather_info.is_some(), "Should have weather info");
         assert!(!result.tags.is_burst);
         assert!(!result.pano_info.is_photosphere);
+        assert!(result.data_url.starts_with("data:image/jpeg;base64,"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_analyze_photo_convenience_method() -> Result<(), MediaAnalyzerError> {
+        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let media_file = asset_path("sunset.jpg");
+
+        // Use the convenience method for photos
+        let result = analyzer.analyze_photo(&media_file).await?;
+
+        // --- Assertions ---
+        // Just a few simple checks to ensure the analysis was successful
+        assert_eq!(result.metadata.width, 5312);
+        assert!(result.gps_info.is_some(), "Should have GPS info");
+        assert!(result.weather_info.is_some(), "Should have weather info");
         assert!(result.data_url.starts_with("data:image/jpeg;base64,"));
 
         Ok(())
