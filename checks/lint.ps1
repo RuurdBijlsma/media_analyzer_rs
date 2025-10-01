@@ -44,9 +44,6 @@ $env:RUSTFLAGS = "-Dwarnings"
 $checksPassed = $true
 
 try {
-    # Build
-    cargo build --all-targets --all-features
-
     # Format check
     Write-Host "`n=== Checking formatting with rustfmt ===" -ForegroundColor Cyan
     cargo fmt --all
@@ -54,6 +51,10 @@ try {
         Write-Host "`nFormatting issues found. Run 'cargo fmt --all' to fix." -ForegroundColor Red
         $checksPassed = $false
     }
+
+    # Build
+    Write-Host "`n=== Build ===" -ForegroundColor Cyan
+    cargo build --all-targets --all-features
 
     # Clippy check
     Write-Host "`n=== Running Clippy checks ===" -ForegroundColor Cyan

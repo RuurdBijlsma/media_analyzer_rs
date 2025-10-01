@@ -1,5 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 use media_analyzer::MediaAnalyzer;
+use std::hint::black_box;
 use std::path::Path;
 use tokio::runtime::Runtime;
 
@@ -21,7 +22,7 @@ fn bench(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let _ = media_analyzer
-                    .analyze_media(image_path, image_path)
+                    .analyze_media(black_box(image_path), black_box(image_path))
                     .await
                     .unwrap();
             });
