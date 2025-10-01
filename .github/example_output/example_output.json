@@ -6,7 +6,7 @@
     "duration": null,
     "sizeBytes": 2814103
   },
-  "capture_details": {
+  "captureDetails": {
     "iso": 21,
     "exposureTime": 0.001341,
     "aperture": 1.68,
@@ -27,7 +27,7 @@
     "captureFps": null,
     "videoFps": null
   },
-  "time_info": {
+  "timeInfo": {
     "datetimeUtc": "2025-01-10T13:15:51Z",
     "datetimeNaive": "2025-01-10T14:15:53.512",
     "timezone": {
@@ -40,14 +40,14 @@
       "confidence": "High"
     }
   },
-  "pano_info": {
+  "panoInfo": {
     "usePanoramaViewer": false,
     "isPhotosphere": false,
     "viewInfo": null,
     "projectionType": null
   },
-  "data_url": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAgAAAQABAAD/wAARCAAGAAoDAREAAhEBAxEB/9sAQwAIBgYHBgUIBwcHCQkICgwUDQwLCwwZEhMPFB0aHx4dGhwcICQuJyAiLCMcHCg3KSwwMTQ0NB8nOT04MjwuMzQy/9sAQwEJCQkMCwwYDQ0YMiEcITIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIy/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwA1D4jaqdWkihAit4bgKIxj5sdicZwac5z5tGEVG2qOq/4TNe9kAe+GzXTzmNj/2Q==",
-  "gps_info": {
+  "dataUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAgAAAQABAAD/wAARCAAGAAoDAREAAhEBAxEB/9sAQwAIBgYHBgUIBwcHCQkICgwUDQwLCwwZEhMPFB0aHx4dGhwcICQuJyAiLCMcHCg3KSwwMTQ0NB8nOT04MjwuMzQy/9sAQwEJCQkMCwwYDQ0YMiEcITIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIy/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwA1D4jaqdWkihAit4bgKIxj5sdicZwac5z5tGEVG2qOq/4TNe9kAe+GzXTzmNj/2Q==",
+  "gpsInfo": {
     "latitude": 38.0290805555556,
     "longitude": 14.0400277777778,
     "altitude": 135.9,
@@ -63,7 +63,7 @@
     "imageDirection": 315.0,
     "imageDirectionRef": "MagneticNorth"
   },
-  "weather_info": {
+  "weatherInfo": {
     "hourly": {
       "datetime": "2025-01-10T13:00:00Z",
       "temperature": 12.5,
@@ -238,7 +238,7 @@
     "Time": {
       "CreateDate": "2025:01:10 14:15:53",
       "DateTimeOriginal": "2025:01:10 14:15:53",
-      "FileAccessDate": "2025:10:01 17:25:11+02:00",
+      "FileAccessDate": "2025:10:01 17:44:00+02:00",
       "FileCreateDate": "2025:10:01 14:22:28+02:00",
       "FileModifyDate": "2025:01:10 14:15:55+01:00",
       "GPSDateStamp": "2025:01:10",
