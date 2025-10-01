@@ -1,7 +1,6 @@
 use media_analyzer::{MediaAnalyzer, MediaAnalyzerError};
 use std::path::Path;
-// TODO: make rust package
-// add error handling
+// TODO:
 // add more tests
 
 #[tokio::main]
