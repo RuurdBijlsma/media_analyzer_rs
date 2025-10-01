@@ -11,9 +11,6 @@ pub enum DataUrlError {
     #[error("Unsupported file type for data URL generation: {0}")]
     UnsupportedFileType(String),
 
-    #[error("Failed to process image")]
-    ImageProcessing(#[from] image::ImageError),
-
     // For thumbnail.write_to, though rare for in-memory buffers
     #[error("I/O error during thumbnail generation")]
     Io(#[from] std::io::Error),

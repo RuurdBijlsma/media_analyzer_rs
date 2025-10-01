@@ -25,7 +25,6 @@ use std::path::{Path, PathBuf};
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), MediaAnalyzerError> {
 /// let analyzer = MediaAnalyzer::builder()
-///     .thumbnail_max_size((50, 50)) // Optionally configure parameters
 ///     .build()
 ///     .await?;
 /// # Ok(())
@@ -36,7 +35,6 @@ pub struct MediaAnalyzer {
     exiftool: ExifTool,
     meteostat: Meteostat,
     weather_search_radius_km: f64,
-    thumbnail_max_size: (u32, u32),
 }
 
 #[bon]
@@ -51,7 +49,6 @@ impl MediaAnalyzer {
     /// * `exiftool_path: Option<PathBuf>` - An optional path to a specific `exiftool` executable. If `None`, `exiftool` will be searched for in the system's PATH.
     /// * `cache_folder: Option<PathBuf>` - An optional path to a directory for caching `Meteostat` data. Using a cache significantly speeds up repeated requests for the same location. If `None`, a default OS-specific cache location will be used.
     /// * `weather_search_radius_km: f64` - (Default: `100.0`) The maximum distance in kilometers to search for a weather station from the media's GPS coordinates.
-    /// * `thumbnail_max_size: (u32, u32)` - (Default: `(10, 10)`) The maximum width and height for the generated data URL thumbnail. The image will be downscaled to fit within these dimensions while preserving its aspect ratio.
     ///
     /// # Errors
     ///
@@ -67,7 +64,6 @@ impl MediaAnalyzer {
     /// # async fn main() -> Result<(), MediaAnalyzerError> {
     /// // Create an analyzer with a custom thumbnail size and weather search radius.
     /// let analyzer = MediaAnalyzer::builder()
-    ///     .thumbnail_max_size((25, 25))
     ///     .weather_search_radius_km(50.0)
     ///     .build()
     ///     .await?;
@@ -79,7 +75,6 @@ impl MediaAnalyzer {
         exiftool_path: Option<PathBuf>,
         cache_folder: Option<PathBuf>,
         #[builder(default = 100.0)] weather_search_radius_km: f64,
-        #[builder(default = (10, 10))] thumbnail_max_size: (u32, u32),
     ) -> Result<Self, MediaAnalyzerError> {
         let exiftool = match exiftool_path {
             Some(path) => ExifTool::with_executable(&path)?,
@@ -95,7 +90,6 @@ impl MediaAnalyzer {
             exiftool,
             meteostat,
             weather_search_radius_km,
-            thumbnail_max_size,
         })
     }
 
@@ -153,7 +147,7 @@ impl MediaAnalyzer {
         media_file: &Path,
         thumbnail: &Path,
     ) -> Result<AnalyzeResult, MediaAnalyzerError> {
-        let data_url = file_to_data_url(thumbnail, self.thumbnail_max_size)?;
+        let data_url = file_to_data_url(thumbnail).await?;
 
         let exif_info = self.exiftool.json(media_file, &["-g2"])?;
         let numeric_exif = self.exiftool.json(media_file, &["-n"])?;
@@ -190,51 +184,6 @@ impl MediaAnalyzer {
             metadata,
             capture_details,
         })
-    }
-
-    /// Analyzes a photo file, using the file itself to generate the thumbnail.
-    ///
-    /// This is a convenience method that calls `analyze_media`, passing the photo's
-    /// path as both the `media_file` and `thumbnail` argument.
-    ///
-    /// # Arguments
-    ///
-    /// * `photo` - A path to the photo file to be analyzed.
-    ///
-    /// # Returns
-    ///
-    /// On success, returns a `Result` containing an [`AnalyzeResult`] struct. See the
-    /// documentation for [`analyze_media`](Self::analyze_media) for a detailed breakdown of the
-    /// returned fields.
-    ///
-    /// # Errors
-    ///
-    /// This function returns the same errors as `analyze_media`. See its documentation
-    /// for details.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// # use std::path::Path;
-    /// # use media_analyzer::{MediaAnalyzer, MediaAnalyzerError};
-    /// # #[tokio::main]
-    /// # async fn main() -> Result<(), MediaAnalyzerError> {
-    /// let mut analyzer = MediaAnalyzer::builder().build().await?;
-    /// let photo_path = Path::new("assets/tent.jpg");
-    ///
-    /// // Analyze a photo using the convenience method.
-    /// let result = analyzer.analyze_photo(photo_path).await?;
-    ///
-    /// println!("Photo taken in {:?}", result.gps_info.unwrap().location);
-    /// println!("Camera Model: {}", result.capture_details.camera_model.unwrap_or_default());
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn analyze_photo(
-        &mut self,
-        photo: &Path,
-    ) -> Result<AnalyzeResult, MediaAnalyzerError> {
-        self.analyze_media(photo, photo).await
     }
 }
 
@@ -273,24 +222,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_analyze_photo_convenience_method() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
-        let media_file = asset_path("sunset.jpg");
-
-        // Use the convenience method for photos
-        let result = analyzer.analyze_photo(&media_file).await?;
-
-        // --- Assertions ---
-        // Just a few simple checks to ensure the analysis was successful
-        assert_eq!(result.metadata.width, 5312);
-        assert!(result.gps_info.is_some(), "Should have GPS info");
-        assert!(result.weather_info.is_some(), "Should have weather info");
-        assert!(result.data_url.starts_with("data:image/jpeg;base64,"));
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_on_hdr() -> Result<(), MediaAnalyzerError> {
         let mut analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("hdr.jpg");
@@ -307,6 +238,29 @@ mod tests {
         assert!(!result.tags.is_burst);
         assert!(!result.pano_info.is_photosphere);
         assert!(result.data_url.starts_with("data:image/jpeg;base64,"));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_on_heic() -> Result<(), MediaAnalyzerError> {
+        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let media_file = asset_path("iphone.HEIC");
+        let thumbnail = asset_path("thumbnail-small.avif");
+
+        // For a photo, the thumbnail is the file itself.
+        let result = analyzer.analyze_media(&media_file, &thumbnail).await?;
+
+        // --- Assertions ---
+        assert_eq!(result.metadata.width, 4032);
+        assert!(!result.tags.is_video);
+        assert!(!result.tags.is_hdr);
+        assert!(result.gps_info.is_some(), "Should have GPS info");
+        assert!(result.weather_info.is_some(), "Should have weather info");
+        assert!(!result.tags.is_burst);
+        assert!(!result.pano_info.is_photosphere);
+        println!("{:?}", result.data_url);
+        assert!(result.data_url.starts_with("data:image/avif;base64,"));
 
         Ok(())
     }
