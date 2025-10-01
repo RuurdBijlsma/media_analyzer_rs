@@ -22,15 +22,16 @@
 //! ```rust,no_run
 //! use std::path::Path;
 //! use media_analyzer::MediaAnalyzer;
+//! use media_analyzer::MediaAnalyzerError;
 //!
 //! #[tokio::main]
-//! async fn main() -> color_eyre::Result<()> {//!
+//! async fn main() -> Result<(), MediaAnalyzerError> {
 //!     // Path to the media file you want to analyze.
 //!     let media_file = Path::new("assets/sunset.jpg");
 //!
 //!     // Analyze the media file.
 //!     let mut analyzer = MediaAnalyzer::builder().build().await?;
-//!     let result = analyzer.analyze_media(media_file, vec![media_file]).await?;
+//!     let result = analyzer.analyze_media(media_file, media_file).await?;
 //!
 //!     // Print the extracted information.
 //!     println!("GPS Location: {:?}", result.gps_info);

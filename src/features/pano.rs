@@ -132,9 +132,10 @@ mod tests {
     use super::*;
     use exiftool::ExifTool;
     use std::path::Path;
+    use crate::MediaAnalyzerError;
 
     #[test]
-    fn test_photosphere() -> color_eyre::Result<()> {
+    fn test_photosphere() -> Result<(), MediaAnalyzerError> {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("assets")
             .join("photosphere.jpg");

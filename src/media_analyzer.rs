@@ -75,7 +75,7 @@ impl MediaAnalyzer {
     ///
     /// # Returns
     ///
-    /// A `color_eyre::Result<AnalyzeResult>` which, on success, contains:
+    /// A `Result<AnalyzeResult, MediaAnalyzerError>` which, on success, contains:
     /// * `exif` - Raw Exif data.
     /// * `tags` - Identified tags such as `is_motion_photo` or `is_night_sight`.
     /// * `time_info` - Time the media was taken, including timezone information.
