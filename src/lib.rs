@@ -98,10 +98,10 @@ pub use media_analyzer::MediaAnalyzerBuilder;
 pub use error::MediaAnalyzerError;
 
 // The main result struct and its components
-pub use features::gps::GpsInfo;
+pub use features::gps::{GpsInfo, LocationName};
 pub use features::metadata::{CaptureDetails, FileMetadata};
 pub use features::pano::{PanoInfo, PanoViewInfo};
 pub use features::weather::{SunInfo, WeatherInfo};
 pub use structs::AnalyzeResult;
 pub use tags::structs::TagData;
-pub use time::structs::TimeInfo;
+pub use time::structs::{SourceDetails, TimeInfo, TimeZoneInfo};

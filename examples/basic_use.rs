@@ -1,8 +1,5 @@
 use media_analyzer::{MediaAnalyzer, MediaAnalyzerError};
 use std::path::Path;
-// TODO:
-// add more tests
-// better docs and readme
 
 #[tokio::main]
 async fn main() -> Result<(), MediaAnalyzerError> {
