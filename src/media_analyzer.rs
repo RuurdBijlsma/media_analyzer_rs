@@ -1,3 +1,4 @@
+use crate::MediaAnalyzerError;
 use crate::features::error::WeatherError;
 use crate::features::gps::get_gps_info;
 use crate::features::metadata::get_metadata;
@@ -6,7 +7,6 @@ use crate::features::weather::get_weather_info;
 use crate::structs::AnalyzeResult;
 use crate::tags::logic::extract_tags;
 use crate::time::get_time_info;
-use crate::MediaAnalyzerError;
 use bon::bon;
 use chrono_tz::Tz;
 use exiftool::ExifTool;
