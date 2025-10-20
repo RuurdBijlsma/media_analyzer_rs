@@ -9,8 +9,7 @@ fn is_hidden(entry: &DirEntry) -> bool {
     entry
         .file_name()
         .to_str()
-        .map(|s| s.starts_with('.'))
-        .unwrap_or(false)
+        .is_some_and(|s| s.starts_with('.'))
 }
 
 /// Recursively lists all files using `walkdir` and `filter_entry`.
