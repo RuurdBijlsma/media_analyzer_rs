@@ -1740,7 +1740,7 @@ dependencies = [
 
 [[package]]
 name = "media_analyzer"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bon",
  "chrono",
