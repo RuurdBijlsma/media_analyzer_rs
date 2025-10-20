@@ -1,16 +1,15 @@
 //! Core logic for determining the best time representation based on extracted components.
 
 use super::error::TimeError;
-use super::extraction::{ExtractedTimeComponents, extract_time_components, get_string_field};
-use crate::GpsInfo;
+use super::extraction::{extract_time_components, get_string_field, ExtractedTimeComponents};
 use crate::time::structs::{
-    CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, SourceDetails, TimeInfo, TimeZoneInfo,
+    SourceDetails, TimeInfo, TimeZoneInfo, CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM,
 };
+use crate::GpsInfo;
 use chrono::{
-    DateTime, FixedOffset, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc,
+    FixedOffset, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc,
 };
 use chrono_tz::Tz;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::Value;
 use std::str::FromStr;
@@ -20,7 +19,7 @@ use tzf_rs::DefaultFinder;
 const MAX_NAIVE_GPS_DIFF_SECONDS: i64 = 10;
 
 // --- Global Timezone Finder ---
-static FINDER: Lazy<DefaultFinder> = Lazy::new(DefaultFinder::new);
+static FINDER: std::sync::LazyLock<DefaultFinder> = std::sync::LazyLock::new(DefaultFinder::new);
 
 /// Main entry point function - Extracts and processes time info.
 ///
@@ -35,7 +34,7 @@ pub fn get_time_info(exif_info: &Value, gps_info: Option<&GpsInfo>) -> Result<Ti
     time_result.ok_or(TimeError::Extraction)
 }
 
-/// Applies the priority logic to extracted components and constructs the final TimeInfo.
+/// Applies the priority logic to extracted components and constructs the final `TimeInfo`.
 /// Kept private to this module, called by `get_time_info`.
 fn apply_priority_logic(
     components: ExtractedTimeComponents,
@@ -78,10 +77,7 @@ fn apply_priority_logic(
                     let tz_info = TimeZoneInfo {
                         name: tz.name().to_string(), // Use the IANA name found
                         offset_seconds: offset_secs,
-                        source: format!(
-                            "{} confirmed by {} @ GPS location",
-                            utc_source, naive_source
-                        ),
+                        source: format!("{utc_source} confirmed by {naive_source} @ GPS location"),
                     };
                     return Some(TimeInfo {
                         datetime_utc: Some(*gps_utc_dt), // Trust the direct GPS UTC time
@@ -167,15 +163,10 @@ fn apply_priority_logic(
     if let Some((naive_dt, ref naive_source)) = best_naive {
         return if let Some((file_dt, ref file_source)) = potential_file_dt {
             let guessed_offset = file_dt.offset().fix();
-            let offset_source_str = format!("Guessed from {}", file_source);
-            let mut iso_utc: Option<DateTime<Utc>> = None;
-
-            if let LocalResult::Single(guessed_dt_offset)
+            let offset_source_str = format!("Guessed from {file_source}" );
+            let iso_utc = if let LocalResult::Single(guessed_dt_offset)
             | LocalResult::Ambiguous(guessed_dt_offset, _) =
-                guessed_offset.from_local_datetime(&naive_dt)
-            {
-                iso_utc = Some(guessed_dt_offset.with_timezone(&Utc));
-            }
+                guessed_offset.from_local_datetime(&naive_dt) { Some(guessed_dt_offset.with_timezone(&Utc)) } else { None };
 
             Some(TimeInfo {
                 datetime_utc: iso_utc,
@@ -279,8 +270,8 @@ fn apply_priority_logic(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::MediaAnalyzerError;
     use crate::features::gps::{GpsInfo, LocationName};
+    use crate::MediaAnalyzerError;
     use chrono::{FixedOffset, NaiveDate};
     use exiftool::ExifTool;
     use std::path::Path;
@@ -302,7 +293,7 @@ mod tests {
             potential_explicit_offset: None,
             potential_file_dt: None,
         };
-        let time_info = apply_priority_logic(components, None, &serde_json::Value::Null).unwrap();
+        let time_info = apply_priority_logic(components, None, &Value::Null).unwrap();
         assert_eq!(time_info.source_details.confidence, CONFIDENCE_LOW);
         assert_eq!(time_info.source_details.time_source, "DateTimeOriginal");
 
@@ -330,7 +321,7 @@ mod tests {
                 "FileModifyDate".to_string(),
             )),
         };
-        let time_info = apply_priority_logic(components, None, &serde_json::Value::Null).unwrap();
+        let time_info = apply_priority_logic(components, None, &Value::Null).unwrap();
         assert_eq!(time_info.source_details.confidence, CONFIDENCE_MEDIUM);
         let tz = time_info.timezone.unwrap();
         assert_eq!(tz.offset_seconds, 2 * 3600);
@@ -365,7 +356,7 @@ mod tests {
                 "FileModifyDate".to_string(),
             )),
         };
-        let time_info = apply_priority_logic(components, None, &serde_json::Value::Null).unwrap();
+        let time_info = apply_priority_logic(components, None, &Value::Null).unwrap();
         assert_eq!(time_info.source_details.confidence, CONFIDENCE_HIGH);
         assert_eq!(time_info.timezone.unwrap().source, "OffsetTime");
 
@@ -404,7 +395,7 @@ mod tests {
             potential_file_dt: None,
         };
         let time_info =
-            apply_priority_logic(components, Some(&amsterdam_gps), &serde_json::Value::Null)
+            apply_priority_logic(components, Some(&amsterdam_gps), &Value::Null)
                 .unwrap();
         assert_eq!(time_info.source_details.confidence, CONFIDENCE_HIGH);
         let tz = time_info.timezone.unwrap();

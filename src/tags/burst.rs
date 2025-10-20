@@ -1,26 +1,23 @@
-use lazy_static::lazy_static;
 use regex::Regex;
 use serde_json::Value;
+use std::sync::LazyLock;
 
-/// Layer 2 of burst detection: Detects burst photos from filename conventions (primarily Android).
+// Captures the common filename prefix before "_burst".
+static BURST_ID_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)(.*?)_burst.*").unwrap());
+
 pub fn detect_burst_from_filename(filename_lower: &str) -> (bool, Option<String>) {
     if !filename_lower.contains("burst") {
         return (false, None);
     }
 
-    lazy_static! {
-        // Captures the common filename prefix before "_burst".
-        static ref BURST_ID_PATTERN: Regex = Regex::new(r"(?i)(.*?)_burst.*").unwrap();
-    }
-
     if let Some(caps) = BURST_ID_PATTERN.captures(filename_lower)
-        && let Some(id) = caps.get(1)
-    {
-        let burst_id = id.as_str();
-        if !burst_id.is_empty() {
-            return (true, Some(burst_id.to_string()));
+        && let Some(id) = caps.get(1) {
+            let burst_id = id.as_str();
+            if !burst_id.is_empty() {
+                return (true, Some(burst_id.to_string()));
+            }
         }
-    }
     (false, None)
 }
 

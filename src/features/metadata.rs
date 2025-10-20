@@ -58,7 +58,7 @@ pub fn get_metadata(exif_data: &Value) -> Result<(FileMetadata, CaptureDetails),
         if let Some(s) = val.as_str() {
             let parts: Vec<f64> = s.split(':').filter_map(|p| p.parse().ok()).collect();
             if parts.len() == 3 {
-                return Some(parts[0] * 3600.0 + parts[1] * 60.0 + parts[2]);
+                return Some(parts[0].mul_add(3600.0, parts[1] * 60.0) + parts[2]);
             }
         }
         // If neither works, it's None.
@@ -87,8 +87,8 @@ pub fn get_metadata(exif_data: &Value) -> Result<(FileMetadata, CaptureDetails),
             width,
             height,
             mime_type,
-            size_bytes,
             duration,
+            size_bytes,
         },
         CaptureDetails {
             iso,

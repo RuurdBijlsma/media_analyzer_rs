@@ -2,7 +2,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 /// Represents the extracted and consolidated time information for a media file.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct TimeInfo {
     /// Timestamp guaranteed to be in UTC (ISO 8601 format with 'Z').
@@ -23,7 +23,7 @@ pub struct TimeInfo {
 }
 
 /// Contains details about the timezone determination.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct TimeZoneInfo {
     /// The name or representation of the timezone.
@@ -33,16 +33,16 @@ pub struct TimeZoneInfo {
     /// The offset from UTC in seconds *at the specific `datetime_naive`*.
     /// For IANA zones, this accounts for DST at that time.
     pub offset_seconds: i32,
-    /// Describes how the timezone information was obtained (e.g., "IANA from GPS", "OffsetTimeOriginal").
+    /// Describes how the timezone information was obtained (e.g., "IANA from GPS", "`OffsetTimeOriginal`").
     pub source: String,
 }
 
 /// Provides context on the origin and reliability of the extracted time information.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceDetails {
     /// The primary EXIF tag or method used to determine `datetime_naive`
-    /// (e.g., "DateTimeOriginal", "GPSDateTime", "FileName").
+    /// (e.g., "`DateTimeOriginal`", "`GPSDateTime`", "`FileName`").
     pub time_source: String,
     /// An indicator of the overall reliability of the `TimeInfo` structure,
     /// especially the `datetime_utc` and `timezone` fields.

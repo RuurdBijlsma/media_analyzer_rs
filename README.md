@@ -72,12 +72,11 @@ async fn main() -> Result<(), MediaAnalyzerError> {
 
     // 2. Define the path to the photo or video file to analyze.
     let media_file = Path::new("path/to/your/photo.jpg");
-    let thumbnail_file = Path::new("path/to/your/thumbnail-small.avif");
 
     // 3. Analyze the photo, for a video you'd use analyze_media.
     //    The thumbnail should be tiny, as it's meant to be a preview file 
     //    that might be shown while the real image is loading. For example, at most 10x10 pixels.
-    let result = analyzer.analyze_media(media_file, thumbnail_file).await?;
+    let result = analyzer.analyze_media(media_file).await?;
 
     // 4. Access the data from the `AnalyzeResult`.
     if let Some(gps) = result.gps_info {

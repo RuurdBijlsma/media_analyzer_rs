@@ -7,7 +7,7 @@ use regex::Regex;
 // Make functions `pub` so they can be used by `extraction.rs` and `logic.rs`.
 
 /// Parses a naive datetime string commonly found in EXIF (YYYY:MM:DD HH:MM:SS[.fff]).
-/// Returns the NaiveDateTime and a boolean indicating if subseconds were present in the string.
+/// Returns the `NaiveDateTime` and a boolean indicating if subseconds were present in the string.
 pub fn parse_naive(s: &str) -> Option<(NaiveDateTime, bool)> {
     let formats = [
         ("%Y:%m:%d %H:%M:%S%.f", true),
@@ -72,13 +72,15 @@ pub fn parse_offset_string(offset_str: &str) -> Option<(i32, String)> {
     None
 }
 
-/// Adds subsecond precision from a separate numeric EXIF field to a NaiveDateTime.
+/// Adds subsecond precision from a separate numeric EXIF field to a `NaiveDateTime`.
 pub fn add_subseconds_from_number(dt: NaiveDateTime, subsec_num: u32) -> NaiveDateTime {
     if subsec_num == 0 {
         return dt;
     }
     let subsec_str = subsec_num.to_string();
-    let num_digits = subsec_str.len() as u32;
+    let Ok(num_digits) = u32::try_from(subsec_str.len()) else {
+        return dt;
+    };
     let nanos = if num_digits <= 9 {
         subsec_num.saturating_mul(10u32.pow(9u32.saturating_sub(num_digits)))
     } else {

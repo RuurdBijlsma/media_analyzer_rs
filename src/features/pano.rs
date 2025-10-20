@@ -47,17 +47,12 @@ pub fn get_pano_info(file_path: &Path, exif: &Value) -> PanoInfo {
     // Step 2: If it's equirectangular, determine if it's a full sphere or a partial pano.
     let pano_info: Option<PanoViewInfo> = if is_equirectangular {
         // Attempt to parse the detailed GPano tags for a partial panorama.
-        if let Some(partial_info) = parse_partial_pano_info(exif) {
-            Some(partial_info)
-        } else {
-            // If the detailed tags are missing, assume it's a full 360° sphere.
-            Some(PanoViewInfo {
+        parse_partial_pano_info(exif).map_or(Some(PanoViewInfo {
                 horizontal_fov_deg: 360.,
                 vertical_fov_deg: 180.,
                 center_yaw_deg: 0.,
                 center_pitch_deg: 0.,
-            })
-        }
+            }), Some)
     } else {
         // Not an equirectangular projection, so not a spherical panorama.
         None
@@ -68,20 +63,13 @@ pub fn get_pano_info(file_path: &Path, exif: &Value) -> PanoInfo {
 
     // Step 3: Determine if the image should be treated as a full photosphere.
     let is_photosphere = if is_equirectangular {
-        match &pano_info {
-            Some(info) => {
+        pano_info.as_ref().is_none_or(|info| {
                 // Case A: We have explicit data. It's a photosphere only if the
                 // data describes a full 360x180 degree view.
                 let is_full_horizontal = (info.horizontal_fov_deg - 360.0).abs() < 0.1;
                 let is_full_vertical = (info.vertical_fov_deg - 180.0).abs() < 0.1;
                 is_full_horizontal && is_full_vertical
-            }
-            None => {
-                // Case B: The image is equirectangular, but the detailed GPano tags
-                // are missing. By convention, we must assume it's a full sphere.
-                true
-            }
-        }
+            })
     } else {
         // Case C: Not an equirectangular image, so it cannot be a photosphere.
         false
@@ -95,7 +83,7 @@ pub fn get_pano_info(file_path: &Path, exif: &Value) -> PanoInfo {
     }
 }
 
-/// Parses the GPano EXIF tags to calculate the dimensions of a partial panorama.
+/// Parses the `GPano` EXIF tags to calculate the dimensions of a partial panorama.
 /// Returns None if the required tags are not present.
 pub fn parse_partial_pano_info(exif: &Value) -> Option<PanoViewInfo> {
     // Attempt to get all six required values as f64. If any are missing, return None.

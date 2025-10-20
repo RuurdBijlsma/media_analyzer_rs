@@ -91,11 +91,11 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
         primary_naive_candidate.as_mut(),
         found_subsecond_number_source.as_ref(),
     ) {
-        if subsec_source != "_ParsedFromString_" {
-            *naive_dt = add_subseconds_from_number(*naive_dt, *subsec_num);
-            *source_name = format!("{} + {}", source_name, subsec_source);
+        if subsec_source == "_ParsedFromString_" {
+            *source_name = format!("{source_name}: Parsed SubSeconds");
         } else {
-            *source_name = format!("{}: Parsed SubSeconds", source_name);
+            *naive_dt = add_subseconds_from_number(*naive_dt, *subsec_num);
+            *source_name = format!("{source_name} + {subsec_source}");
         }
     }
     let best_naive = primary_naive_candidate;
@@ -112,7 +112,7 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
             get_string_field(exif_info, "Time", "GPSTimeStamp"),
         )
     {
-        let combined_str = format!("{} {}Z", date_str, time_str);
+        let combined_str = format!("{date_str} {time_str}Z");
         if let Some(dt_utc) = parse_datetime_utc_z(&combined_str) {
             potential_utc = Some((dt_utc, "GPSDateStamp/GPSTimeStamp".to_string()));
         }

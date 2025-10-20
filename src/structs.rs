@@ -13,7 +13,6 @@ pub struct AnalyzeResult {
     pub tags: TagData,
     pub time_info: TimeInfo,
     pub pano_info: PanoInfo,
-    pub data_url: String,
     pub gps_info: Option<GpsInfo>,
     pub weather_info: Option<WeatherInfo>,
 }

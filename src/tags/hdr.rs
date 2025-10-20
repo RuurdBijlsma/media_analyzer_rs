@@ -3,18 +3,16 @@ use serde_json::Value;
 pub fn detect_hdr(v: &Value) -> bool {
     // 1. Pixel: CompositeImage == 3
     if v.get("CompositeImage")
-        .and_then(|x| x.as_i64())
-        .map(|x| x == 3)
-        .unwrap_or(false)
+        .and_then(Value::as_i64)
+        .is_some_and(|x| x == 3)
     {
         return true;
     }
 
     // 2. SceneCaptureType == 3 (some DSLRs / iPhones)
     if v.get("SceneCaptureType")
-        .and_then(|x| x.as_i64())
-        .map(|x| x == 3)
-        .unwrap_or(false)
+        .and_then(Value::as_i64)
+        .is_some_and(|x| x == 3)
     {
         return true;
     }
@@ -27,8 +25,7 @@ pub fn detect_hdr(v: &Value) -> bool {
     // 4. Software string contains "hdr"
     if v.get("Software")
         .and_then(|x| x.as_str())
-        .map(|s| s.to_lowercase().contains("hdr"))
-        .unwrap_or(false)
+        .is_some_and(|s| s.to_lowercase().contains("hdr"))
     {
         return true;
     }
@@ -37,14 +34,12 @@ pub fn detect_hdr(v: &Value) -> bool {
     if v.get("GainMapImage").is_some()
         || v.get("DirectoryItemSemantic")
             .and_then(|x| x.as_array())
-            .map(|arr| {
+            .is_some_and(|arr| {
                 arr.iter().any(|s| {
                     s.as_str()
-                        .map(|s| s.eq_ignore_ascii_case("GainMap"))
-                        .unwrap_or(false)
+                        .is_some_and(|s| s.eq_ignore_ascii_case("GainMap"))
                 })
             })
-            .unwrap_or(false)
     {
         return true;
     }

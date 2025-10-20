@@ -1,5 +1,4 @@
 use crate::MediaAnalyzerError;
-use crate::features::data_url::file_to_data_url;
 use crate::features::error::WeatherError;
 use crate::features::gps::get_gps_info;
 use crate::features::metadata::get_metadata;
@@ -112,7 +111,6 @@ impl MediaAnalyzer {
     /// * `tags`: Boolean flags for special media types (e.g., `is_motion_photo`, `is_slowmotion`).
     /// * `time_info`: Consolidated time information, including the best-guess UTC timestamp and timezone.
     /// * `pano_info`: Data related to panoramic images, including photospheres.
-    /// * `data_url`: A small, Base64-encoded JPEG data URL for use as a blurred preview.
     /// * `gps_info`: GPS coordinates and reverse-geocoded location details.
     /// * `weather_info`: Historical weather and sun information for the time and place of capture. This is a "best-effort" field and will be `None` if GPS or time data is missing, or if the weather service fails.
     ///
@@ -135,7 +133,7 @@ impl MediaAnalyzer {
     /// let photo_path = Path::new("assets/tent.jpg");
     ///
     /// // Analyze a photo, using the photo itself as the thumbnail source.
-    /// let result = analyzer.analyze_media(photo_path, photo_path).await?;
+    /// let result = analyzer.analyze_media(photo_path).await?;
     ///
     /// println!("Photo taken in {:?}", result.gps_info.unwrap().location);
     /// println!("Camera Model: {}", result.capture_details.camera_model.unwrap_or_default());
@@ -145,10 +143,7 @@ impl MediaAnalyzer {
     pub async fn analyze_media(
         &mut self,
         media_file: &Path,
-        thumbnail: &Path,
     ) -> Result<AnalyzeResult, MediaAnalyzerError> {
-        let data_url = file_to_data_url(thumbnail).await?;
-
         let exif_info = self.exiftool.json(media_file, &["-g2"])?;
         let numeric_exif = self.exiftool.json(media_file, &["-n"])?;
 
@@ -180,7 +175,6 @@ impl MediaAnalyzer {
             weather_info,
             gps_info,
             pano_info,
-            data_url,
             metadata,
             capture_details,
         })
@@ -206,7 +200,7 @@ mod tests {
         let media_file = asset_path("sunset.jpg");
 
         // For a photo, the thumbnail is the file itself.
-        let result = analyzer.analyze_media(&media_file, &media_file).await?;
+        let result = analyzer.analyze_media(&media_file).await?;
 
         // --- Assertions ---
         assert_eq!(result.metadata.width, 5312);
@@ -216,7 +210,6 @@ mod tests {
         assert!(result.weather_info.is_some(), "Should have weather info");
         assert!(!result.tags.is_burst);
         assert!(!result.pano_info.is_photosphere);
-        assert!(result.data_url.starts_with("data:image/jpeg;base64,"));
 
         Ok(())
     }
@@ -227,7 +220,7 @@ mod tests {
         let media_file = asset_path("hdr.jpg");
 
         // For a photo, the thumbnail is the file itself.
-        let result = analyzer.analyze_media(&media_file, &media_file).await?;
+        let result = analyzer.analyze_media(&media_file).await?;
 
         // --- Assertions ---
         assert_eq!(result.metadata.width, 4032);
@@ -237,7 +230,6 @@ mod tests {
         assert!(result.weather_info.is_some(), "Should have weather info");
         assert!(!result.tags.is_burst);
         assert!(!result.pano_info.is_photosphere);
-        assert!(result.data_url.starts_with("data:image/jpeg;base64,"));
 
         Ok(())
     }
@@ -246,10 +238,9 @@ mod tests {
     async fn test_on_heic() -> Result<(), MediaAnalyzerError> {
         let mut analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("iphone.HEIC");
-        let thumbnail = asset_path("thumbnail-small.avif");
 
         // For a photo, the thumbnail is the file itself.
-        let result = analyzer.analyze_media(&media_file, &thumbnail).await?;
+        let result = analyzer.analyze_media(&media_file).await?;
 
         // --- Assertions ---
         assert_eq!(result.metadata.width, 4032);
@@ -259,8 +250,6 @@ mod tests {
         assert!(result.weather_info.is_some(), "Should have weather info");
         assert!(!result.tags.is_burst);
         assert!(!result.pano_info.is_photosphere);
-        println!("{:?}", result.data_url);
-        assert!(result.data_url.starts_with("data:image/avif;base64,"));
 
         Ok(())
     }
@@ -269,10 +258,8 @@ mod tests {
     async fn test_full_analysis_on_standard_video() -> Result<(), MediaAnalyzerError> {
         let mut analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("video/car.webm");
-        // Use a frame from the video as the thumbnail.
-        let thumbnail = asset_path("video/frame1.jpg");
 
-        let result = analyzer.analyze_media(&media_file, &thumbnail).await?;
+        let result = analyzer.analyze_media(&media_file).await?;
 
         // --- Assertions ---
         assert!(result.tags.is_video);
@@ -291,7 +278,7 @@ mod tests {
         let mut analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("motion/PXL_20250103_180944831.MP.jpg");
 
-        let result = analyzer.analyze_media(&media_file, &media_file).await?;
+        let result = analyzer.analyze_media(&media_file).await?;
 
         // --- Assertions ---
         assert!(
@@ -309,7 +296,7 @@ mod tests {
         let mut analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("photosphere.jpg");
 
-        let result = analyzer.analyze_media(&media_file, &media_file).await?;
+        let result = analyzer.analyze_media(&media_file).await?;
 
         // --- Assertions ---
         assert!(result.pano_info.is_photosphere);
@@ -327,7 +314,7 @@ mod tests {
         let mut analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("night_sight/PXL_20250104_170020532.NIGHT.jpg");
 
-        let result = analyzer.analyze_media(&media_file, &media_file).await?;
+        let result = analyzer.analyze_media(&media_file).await?;
 
         // --- Assertions ---
         assert!(result.tags.is_night_sight);
@@ -340,9 +327,8 @@ mod tests {
         let mut analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("slowmotion.mp4");
         // For video tests, we can just use any jpg as a placeholder thumbnail
-        let thumbnail = asset_path("sunset.jpg");
 
-        let result = analyzer.analyze_media(&media_file, &thumbnail).await?;
+        let result = analyzer.analyze_media(&media_file).await?;
 
         // --- Assertions ---
         assert!(result.tags.is_video);
@@ -356,9 +342,8 @@ mod tests {
     async fn test_timelapse_video_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
         let mut analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("timelapse.mp4");
-        let thumbnail = asset_path("sunset.jpg");
 
-        let result = analyzer.analyze_media(&media_file, &thumbnail).await?;
+        let result = analyzer.analyze_media(&media_file).await?;
 
         // --- Assertions ---
         assert!(result.tags.is_video);
@@ -372,9 +357,8 @@ mod tests {
     async fn test_analysis_fails_gracefully_for_non_media_file() -> Result<(), MediaAnalyzerError> {
         let mut analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("text_file.txt");
-        let thumbnail = asset_path("sunset.jpg"); // Thumbnail must be valid
 
-        let result = analyzer.analyze_media(&media_file, &thumbnail).await;
+        let result = analyzer.analyze_media(&media_file).await;
 
         // --- Assertions ---
         assert!(result.is_err(), "Analysis should fail for a non-media file");
@@ -394,7 +378,7 @@ mod tests {
         let mut analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("sunset.jpg");
 
-        let result = analyzer.analyze_media(&media_file, &media_file).await?;
+        let result = analyzer.analyze_media(&media_file).await?;
 
         // --- 1. GPS Info Assertions ---
         let gps_info = result

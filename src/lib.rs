@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_lines)]
 //! # Media Analyzer
 //!
 //! A toolkit for extracting info from video and photo files.
@@ -64,7 +65,7 @@
 //!     let media_file = Path::new("assets/sunset.jpg");
 //!
 //!     // 3. Analyze the media file. For a photo, the file itself can serve as the thumbnail.
-//!     let result = analyzer.analyze_media(media_file, media_file).await?;
+//!     let result = analyzer.analyze_media(media_file).await?;
 //!
 //!     // 4. Access the structured data from the `AnalyzeResult`.
 //!     if let Some(gps) = result.gps_info {
