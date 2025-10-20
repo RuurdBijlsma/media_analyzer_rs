@@ -1,11 +1,11 @@
 //! Core logic for determining the best time representation based on extracted components.
 
 use super::error::TimeError;
-use super::extraction::{extract_time_components, get_string_field, ExtractedTimeComponents};
-use crate::time::structs::{
-    SourceDetails, TimeInfo, TimeZoneInfo, CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM,
-};
+use super::extraction::{ExtractedTimeComponents, extract_time_components, get_string_field};
 use crate::GpsInfo;
+use crate::time::structs::{
+    CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, SourceDetails, TimeInfo, TimeZoneInfo,
+};
 use chrono::{
     FixedOffset, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc,
 };
@@ -163,10 +163,15 @@ fn apply_priority_logic(
     if let Some((naive_dt, ref naive_source)) = best_naive {
         return if let Some((file_dt, ref file_source)) = potential_file_dt {
             let guessed_offset = file_dt.offset().fix();
-            let offset_source_str = format!("Guessed from {file_source}" );
+            let offset_source_str = format!("Guessed from {file_source}");
             let iso_utc = if let LocalResult::Single(guessed_dt_offset)
             | LocalResult::Ambiguous(guessed_dt_offset, _) =
-                guessed_offset.from_local_datetime(&naive_dt) { Some(guessed_dt_offset.with_timezone(&Utc)) } else { None };
+                guessed_offset.from_local_datetime(&naive_dt)
+            {
+                Some(guessed_dt_offset.with_timezone(&Utc))
+            } else {
+                None
+            };
 
             Some(TimeInfo {
                 datetime_utc: iso_utc,
@@ -270,8 +275,8 @@ fn apply_priority_logic(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::features::gps::{GpsInfo, LocationName};
     use crate::MediaAnalyzerError;
+    use crate::features::gps::{GpsInfo, LocationName};
     use chrono::{FixedOffset, NaiveDate};
     use exiftool::ExifTool;
     use std::path::Path;
@@ -395,8 +400,7 @@ mod tests {
             potential_file_dt: None,
         };
         let time_info =
-            apply_priority_logic(components, Some(&amsterdam_gps), &Value::Null)
-                .unwrap();
+            apply_priority_logic(components, Some(&amsterdam_gps), &Value::Null).unwrap();
         assert_eq!(time_info.source_details.confidence, CONFIDENCE_HIGH);
         let tz = time_info.timezone.unwrap();
         assert_eq!(tz.name, "Europe/Amsterdam");

@@ -12,12 +12,13 @@ pub fn detect_burst_from_filename(filename_lower: &str) -> (bool, Option<String>
     }
 
     if let Some(caps) = BURST_ID_PATTERN.captures(filename_lower)
-        && let Some(id) = caps.get(1) {
-            let burst_id = id.as_str();
-            if !burst_id.is_empty() {
-                return (true, Some(burst_id.to_string()));
-            }
+        && let Some(id) = caps.get(1)
+    {
+        let burst_id = id.as_str();
+        if !burst_id.is_empty() {
+            return (true, Some(burst_id.to_string()));
         }
+    }
     (false, None)
 }
 

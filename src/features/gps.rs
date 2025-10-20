@@ -35,7 +35,9 @@ pub async fn get_gps_info(geocoder: &ReverseGeocoder, numeric_exif: &Value) -> O
     let (Some(latitude), Some(longitude)) = (
         numeric_exif.get("GPSLatitude").and_then(Value::as_f64),
         numeric_exif.get("GPSLongitude").and_then(Value::as_f64),
-    ) else { return None };
+    ) else {
+        return None;
+    };
     let altitude = numeric_exif.get("GPSAltitude").and_then(Value::as_f64);
     let image_direction = numeric_exif.get("GPSImgDirection").and_then(Value::as_f64);
     let image_direction_ref = numeric_exif
