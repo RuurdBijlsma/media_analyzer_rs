@@ -81,7 +81,7 @@ fn apply_priority_logic(
                     };
                     return Some(TimeInfo {
                         datetime_utc: Some(*gps_utc_dt), // Trust the direct GPS UTC time
-                        datetime_naive: *naive_dt,       // Keep the original naive time
+                        datetime_local: *naive_dt,       // Local naive time the picture was taken.
                         timezone: Some(tz_info),
                         source_details: SourceDetails {
                             time_source: naive_source.clone(),
@@ -105,7 +105,7 @@ fn apply_priority_logic(
                 let offset_secs = zoned_dt.offset().fix().local_minus_utc();
                 return Some(TimeInfo {
                     datetime_utc: Some(utc_dt),
-                    datetime_naive: naive_dt,
+                    datetime_local: naive_dt,
                     timezone: Some(TimeZoneInfo {
                         name: tz.name().to_string(),
                         offset_seconds: offset_secs,
@@ -128,7 +128,7 @@ fn apply_priority_logic(
             let utc_dt = dt_with_offset.with_timezone(&Utc);
             return Some(TimeInfo {
                 datetime_utc: Some(utc_dt),
-                datetime_naive: naive_dt,
+                datetime_local: naive_dt,
                 timezone: Some(TimeZoneInfo {
                     name: offset_str.clone(),
                     offset_seconds: offset_secs,
@@ -146,7 +146,7 @@ fn apply_priority_logic(
     if let Some((utc_dt, ref utc_source)) = potential_utc {
         return Some(TimeInfo {
             datetime_utc: Some(utc_dt),
-            datetime_naive: utc_dt.naive_utc(),
+            datetime_local: utc_dt.naive_utc(),
             timezone: Some(TimeZoneInfo {
                 name: "UTC".to_string(),
                 offset_seconds: 0,
@@ -175,7 +175,7 @@ fn apply_priority_logic(
 
             Some(TimeInfo {
                 datetime_utc: iso_utc,
-                datetime_naive: naive_dt,
+                datetime_local: naive_dt,
                 timezone: Some(TimeZoneInfo {
                     name: guessed_offset.to_string(),
                     offset_seconds: guessed_offset.local_minus_utc(),
@@ -190,7 +190,7 @@ fn apply_priority_logic(
             // --- Priority 6: Naive Only (from EXIF) ---
             Some(TimeInfo {
                 datetime_utc: None,
-                datetime_naive: naive_dt,
+                datetime_local: naive_dt,
                 timezone: None,
                 source_details: SourceDetails {
                     time_source: naive_source.clone(),
@@ -231,7 +231,7 @@ fn apply_priority_logic(
             {
                 return Some(TimeInfo {
                     datetime_utc: None,
-                    datetime_naive: NaiveDateTime::new(date, time),
+                    datetime_local: NaiveDateTime::new(date, time),
                     timezone: None,
                     source_details: SourceDetails {
                         time_source: "FileName".to_string(),
@@ -254,7 +254,7 @@ fn apply_priority_logic(
         return Some(TimeInfo {
             datetime_utc: Some(utc_dt),
             // The 'naive' time is the file's time as it was recorded (local perspective)
-            datetime_naive: file_dt.naive_local(),
+            datetime_local: file_dt.naive_local(),
             timezone: Some(TimeZoneInfo {
                 name: offset.to_string(), // e.g., "+02:00"
                 offset_seconds: offset.local_minus_utc(),
@@ -436,7 +436,7 @@ mod tests {
         assert_eq!(time_info.source_details.time_source, "GPSDateTime");
         assert!(time_info.datetime_utc.is_some());
         assert_eq!(
-            time_info.datetime_naive,
+            time_info.datetime_local,
             NaiveDate::from_ymd_opt(2015, 8, 13)
                 .unwrap()
                 .and_hms_opt(14, 5, 18)
