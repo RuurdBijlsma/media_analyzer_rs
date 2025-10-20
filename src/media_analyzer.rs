@@ -8,6 +8,7 @@ use crate::structs::AnalyzeResult;
 use crate::tags::logic::extract_tags;
 use crate::time::get_time_info;
 use bon::bon;
+use chrono_tz::Tz;
 use exiftool::ExifTool;
 use meteostat::Meteostat;
 use reverse_geocoder::ReverseGeocoder;
@@ -30,6 +31,7 @@ use std::path::{Path, PathBuf};
 /// # }
 /// ```
 pub struct MediaAnalyzer {
+    fallback_timezone: Option<Tz>,
     geocoder: ReverseGeocoder,
     exiftool: ExifTool,
     meteostat: Meteostat,
@@ -48,6 +50,7 @@ impl MediaAnalyzer {
     /// * `exiftool_path: Option<PathBuf>` - An optional path to a specific `exiftool` executable. If `None`, `exiftool` will be searched for in the system's PATH.
     /// * `cache_folder: Option<PathBuf>` - An optional path to a directory for caching `Meteostat` data. Using a cache significantly speeds up repeated requests for the same location. If `None`, a default OS-specific cache location will be used.
     /// * `weather_search_radius_km: f64` - (Default: `100.0`) The maximum distance in kilometers to search for a weather station from the media's GPS coordinates.
+    /// * `fallback_timezone: Option<Tz>` - (Default: `None`) Fallback timezone to use when extracting capture datetime from exif/filename.
     ///
     /// # Errors
     ///
@@ -73,6 +76,7 @@ impl MediaAnalyzer {
     pub async fn new(
         exiftool_path: Option<PathBuf>,
         cache_folder: Option<PathBuf>,
+        fallback_timezone: Option<Tz>,
         #[builder(default = 100.0)] weather_search_radius_km: f64,
     ) -> Result<Self, MediaAnalyzerError> {
         let exiftool = match exiftool_path {
@@ -85,6 +89,7 @@ impl MediaAnalyzer {
         };
         let geocoder = ReverseGeocoder::new();
         Ok(Self {
+            fallback_timezone,
             geocoder,
             exiftool,
             meteostat,
@@ -152,7 +157,7 @@ impl MediaAnalyzer {
         let gps_info = get_gps_info(&self.geocoder, &numeric_exif).await;
         let pano_info = get_pano_info(media_file, &numeric_exif);
 
-        let time_info = get_time_info(&exif_info, gps_info.as_ref())?;
+        let time_info = get_time_info(&exif_info, gps_info.as_ref(), self.fallback_timezone)?;
 
         let weather_info =
             if let (Some(gps), Some(utc_time)) = (gps_info.as_ref(), time_info.datetime_utc) {

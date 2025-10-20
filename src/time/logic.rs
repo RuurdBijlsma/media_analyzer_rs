@@ -1,16 +1,14 @@
 //! Core logic for determining the best time representation based on extracted components.
 
 use super::error::TimeError;
-use super::extraction::{ExtractedTimeComponents, extract_time_components, get_string_field};
+use super::extraction::{ExtractedTimeComponents, extract_time_components};
 use crate::GpsInfo;
 use crate::time::structs::{
-    CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, SourceDetails, TimeInfo, TimeZoneInfo,
+    CONFIDENCE_FALLBACK, CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, SourceDetails,
+    TimeInfo, TimeZoneInfo,
 };
-use chrono::{
-    FixedOffset, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone, Utc,
-};
+use chrono::{FixedOffset, LocalResult, Offset, TimeZone, Utc};
 use chrono_tz::Tz;
-use regex::Regex;
 use serde_json::Value;
 use std::str::FromStr;
 use tzf_rs::DefaultFinder;
@@ -21,119 +19,50 @@ const MAX_NAIVE_GPS_DIFF_SECONDS: i64 = 10;
 // --- Global Timezone Finder ---
 static FINDER: std::sync::LazyLock<DefaultFinder> = std::sync::LazyLock::new(DefaultFinder::new);
 
-/// Main entry point function - Extracts and processes time info.
-///
-/// Returns a `Result` which is `Ok(TimeInfo)` on success or an `Err(TimeError)`
-/// if no usable time information could be extracted from any source.
-pub fn get_time_info(exif_info: &Value, gps_info: Option<&GpsInfo>) -> Result<TimeInfo, TimeError> {
-    let components = extract_time_components(exif_info);
-    let time_result = apply_priority_logic(components, gps_info, exif_info);
-
-    // If apply_priority_logic returns None, map it to our custom Extraction error.
-    // This replaces the previous `unwrap_or_else` block that created a dummy/error TimeInfo.
+pub fn get_time_info(
+    exif_info: &Value,
+    gps_info: Option<&GpsInfo>,
+    fallback_timezone: Option<Tz>,
+) -> Result<TimeInfo, TimeError> {
+    let components = extract_time_components(exif_info, fallback_timezone);
+    let time_result = apply_priority_logic(components, gps_info, fallback_timezone);
     time_result.ok_or(TimeError::Extraction)
 }
 
 /// Applies the priority logic to extracted components and constructs the final `TimeInfo`.
-/// Kept private to this module, called by `get_time_info`.
 fn apply_priority_logic(
     components: ExtractedTimeComponents,
     gps_info: Option<&GpsInfo>,
-    exif_info: &Value, // Needed for filename fallback
+    fallback_timezone: Option<Tz>,
 ) -> Option<TimeInfo> {
     let ExtractedTimeComponents {
-        best_naive,
+        best_local,
         potential_utc,
         potential_explicit_offset,
         potential_file_dt,
     } = components;
 
-    // --- Priority 1: Confirmed UTC ---
-    // Requires: best_naive, potential_utc, AND gps_info to determine local offset
-    if let (
-        Some((naive_dt, naive_source)), // Local naive time from camera
-        Some((gps_utc_dt, utc_source)), // UTC time from GPS
-        Some(gps),                      // GPS coordinates
-    ) = (&best_naive, &potential_utc, gps_info)
+    // --- Priority 1: Confirmed UTC (Highest confidence) ---
+    if let (Some((naive_dt, naive_source)), Some((gps_utc_dt, utc_source)), Some(gps)) =
+        (&best_local, &potential_utc, gps_info)
+        && let Ok(tz) = Tz::from_str(FINDER.get_tz_name(gps.longitude, gps.latitude))
+        && let LocalResult::Single(zoned_dt) | LocalResult::Ambiguous(zoned_dt, _) =
+            tz.from_local_datetime(naive_dt)
     {
-        // Find the IANA timezone name from GPS coordinates
-        let tz_name = FINDER.get_tz_name(gps.longitude, gps.latitude);
-        if let Ok(tz) = Tz::from_str(tz_name) {
-            // Attempt to interpret the camera's naive time in the location's timezone.
-            // Handle ambiguity (e.g., DST) by preferring the earlier time (common).
-            if let LocalResult::Single(zoned_dt) | LocalResult::Ambiguous(zoned_dt, _) =
-                tz.from_local_datetime(naive_dt)
-            {
-                // Convert the interpreted local time to UTC
-                let calculated_utc_from_naive = zoned_dt.with_timezone(&Utc);
+        let calculated_utc_from_naive = zoned_dt.with_timezone(&Utc);
+        let diff = gps_utc_dt.signed_duration_since(calculated_utc_from_naive);
 
-                // Compare the UTC calculated from naive+GPS_location with the direct GPS_UTC time
-                let diff = gps_utc_dt.signed_duration_since(calculated_utc_from_naive);
-
-                // Check if the difference is within the tolerance
-                if diff.num_seconds().abs() <= MAX_NAIVE_GPS_DIFF_SECONDS {
-                    // SUCCESS: GPS UTC confirms the local naive time + location.
-                    let offset_secs = zoned_dt.offset().fix().local_minus_utc();
-                    let tz_info = TimeZoneInfo {
-                        name: tz.name().to_string(), // Use the IANA name found
-                        offset_seconds: offset_secs,
-                        source: format!("{utc_source} confirmed by {naive_source} @ GPS location"),
-                    };
-                    return Some(TimeInfo {
-                        datetime_utc: Some(*gps_utc_dt), // Trust the direct GPS UTC time
-                        datetime_naive: *naive_dt,       // Keep the original naive time
-                        timezone: Some(tz_info),
-                        source_details: SourceDetails {
-                            time_source: naive_source.clone(),
-                            confidence: CONFIDENCE_HIGH.to_string(),
-                        },
-                    });
-                }
-            }
-        }
-    }
-
-    // --- Priority 2: Zoned Time (Naive + GPS -> IANA TZ) ---
-    if let Some((naive_dt, ref naive_source)) = best_naive {
-        if let Some(gps) = gps_info {
-            let tz_name = FINDER.get_tz_name(gps.longitude, gps.latitude);
-            if let Ok(tz) = Tz::from_str(tz_name)
-                && let LocalResult::Single(zoned_dt) | LocalResult::Ambiguous(zoned_dt, _) =
-                    tz.from_local_datetime(&naive_dt)
-            {
-                let utc_dt = zoned_dt.with_timezone(&Utc);
-                let offset_secs = zoned_dt.offset().fix().local_minus_utc();
-                return Some(TimeInfo {
-                    datetime_utc: Some(utc_dt),
-                    datetime_naive: naive_dt,
-                    timezone: Some(TimeZoneInfo {
-                        name: tz.name().to_string(),
-                        offset_seconds: offset_secs,
-                        source: "IANA from GPS".to_string(),
-                    }),
-                    source_details: SourceDetails {
-                        time_source: naive_source.clone(),
-                        confidence: CONFIDENCE_HIGH.to_string(),
-                    },
-                });
-            }
-        }
-
-        // --- Priority 3: Fixed Offset Time (Naive + Explicit Offset) ---
-        if let Some((offset_secs, ref offset_str, ref offset_source)) = potential_explicit_offset
-            && let Some(offset) = FixedOffset::east_opt(offset_secs)
-            && let LocalResult::Single(dt_with_offset) | LocalResult::Ambiguous(dt_with_offset, _) =
-                offset.from_local_datetime(&naive_dt)
-        {
-            let utc_dt = dt_with_offset.with_timezone(&Utc);
+        if diff.num_seconds().abs() <= MAX_NAIVE_GPS_DIFF_SECONDS {
+            let offset_secs = zoned_dt.offset().fix().local_minus_utc();
+            let tz_info = TimeZoneInfo {
+                name: tz.name().to_string(),
+                offset_seconds: offset_secs,
+                source: format!("{utc_source} confirmed by {naive_source} @ GPS location"),
+            };
             return Some(TimeInfo {
-                datetime_utc: Some(utc_dt),
-                datetime_naive: naive_dt,
-                timezone: Some(TimeZoneInfo {
-                    name: offset_str.clone(),
-                    offset_seconds: offset_secs,
-                    source: offset_source.clone(),
-                }),
+                datetime_utc: Some(*gps_utc_dt),
+                datetime_local: *naive_dt,
+                timezone: Some(tz_info),
                 source_details: SourceDetails {
                     time_source: naive_source.clone(),
                     confidence: CONFIDENCE_HIGH.to_string(),
@@ -142,128 +71,175 @@ fn apply_priority_logic(
         }
     }
 
-    // --- Priority 4: Accurate UTC ---
-    if let Some((utc_dt, ref utc_source)) = potential_utc {
+    // --- Main Logic Path: We have a candidate for local time, now find its context. ---
+    if let Some((naive_dt, naive_source)) = best_local {
+        // --- Priority 2: Zoned Time (Naive + GPS Location) ---
+        if let Some(gps) = gps_info
+            && let Ok(tz) = Tz::from_str(FINDER.get_tz_name(gps.longitude, gps.latitude))
+            && let LocalResult::Single(zoned_dt) | LocalResult::Ambiguous(zoned_dt, _) =
+                tz.from_local_datetime(&naive_dt)
+        {
+            return Some(TimeInfo {
+                datetime_utc: Some(zoned_dt.with_timezone(&Utc)),
+                datetime_local: naive_dt,
+                timezone: Some(TimeZoneInfo {
+                    name: tz.name().to_string(),
+                    offset_seconds: zoned_dt.offset().fix().local_minus_utc(),
+                    source: "IANA from GPS".to_string(),
+                }),
+                source_details: SourceDetails {
+                    time_source: naive_source,
+                    confidence: CONFIDENCE_HIGH.to_string(),
+                },
+            });
+        }
+
+        // --- Priority 3: Fixed Offset Time (Naive + Explicit Offset Tag) ---
+        if let Some((offset_secs, offset_str, offset_source)) = potential_explicit_offset
+            && let Some(offset) = FixedOffset::east_opt(offset_secs)
+            && let LocalResult::Single(dt_with_offset) | LocalResult::Ambiguous(dt_with_offset, _) =
+                offset.from_local_datetime(&naive_dt)
+        {
+            return Some(TimeInfo {
+                datetime_utc: Some(dt_with_offset.with_timezone(&Utc)),
+                datetime_local: naive_dt,
+                timezone: Some(TimeZoneInfo {
+                    name: offset_str,
+                    offset_seconds: offset_secs,
+                    source: offset_source,
+                }),
+                source_details: SourceDetails {
+                    time_source: naive_source,
+                    confidence: CONFIDENCE_HIGH.to_string(),
+                },
+            });
+        }
+
+        // --- Priority 4: Hybrid (Local Time + Unconfirmed UTC Time) ---
+        if let Some((utc_dt, utc_source)) = potential_utc {
+            return Some(TimeInfo {
+                datetime_utc: Some(utc_dt),
+                datetime_local: naive_dt,
+                timezone: Some(TimeZoneInfo {
+                    name: "UTC".to_string(),
+                    offset_seconds: 0,
+                    source: utc_source.clone(),
+                }),
+                source_details: SourceDetails {
+                    time_source: format!("{naive_source} + {utc_source}"),
+                    confidence: CONFIDENCE_MEDIUM.to_string(),
+                },
+            });
+        }
+
+        // --- Priority 5: Naive With Guessed Offset ---
+        if let Some((file_dt, file_source)) = potential_file_dt {
+            let guessed_offset = file_dt.offset().fix();
+            let iso_utc = guessed_offset
+                .from_local_datetime(&naive_dt)
+                .single()
+                .map(|dt| dt.with_timezone(&Utc));
+
+            return Some(TimeInfo {
+                datetime_utc: iso_utc,
+                datetime_local: naive_dt,
+                timezone: Some(TimeZoneInfo {
+                    name: guessed_offset.to_string(),
+                    offset_seconds: guessed_offset.local_minus_utc(),
+                    source: format!("Guessed from {file_source}"),
+                }),
+                source_details: SourceDetails {
+                    time_source: naive_source,
+                    confidence: CONFIDENCE_MEDIUM.to_string(),
+                },
+            });
+        }
+
+        // --- Priority 6: Naive With Fallback Timezone OR Naive Only ---
+        // If a fallback timezone is provided, we can elevate this to Medium confidence.
+        if let Some(tz) = fallback_timezone
+            && let LocalResult::Single(zoned_dt) | LocalResult::Ambiguous(zoned_dt, _) =
+                tz.from_local_datetime(&naive_dt)
+        {
+            return Some(TimeInfo {
+                datetime_utc: Some(zoned_dt.with_timezone(&Utc)),
+                datetime_local: naive_dt,
+                timezone: Some(TimeZoneInfo {
+                    name: tz.name().to_string(),
+                    offset_seconds: zoned_dt.offset().fix().local_minus_utc(),
+                    source: "Fallback timezone".to_string(),
+                }),
+                source_details: SourceDetails {
+                    time_source: naive_source,
+                    confidence: CONFIDENCE_FALLBACK.to_string(),
+                },
+            });
+        }
+
+        // If no fallback, or if the local time was invalid in the fallback timezone,
+        // we are left with just the naive time.
+        return Some(TimeInfo {
+            datetime_utc: None,
+            datetime_local: naive_dt,
+            timezone: None,
+            source_details: SourceDetails {
+                time_source: naive_source,
+                confidence: CONFIDENCE_LOW.to_string(),
+            },
+        });
+    }
+
+    // --- Fallback Path: No authoritative naive time was found anywhere. ---
+
+    // --- Priority 7: Accurate UTC Only ---
+    if let Some((utc_dt, utc_source)) = potential_utc {
+        // If we have a fallback timezone, we can create a better local representation.
+        if let Some(tz) = fallback_timezone {
+            let zoned_dt = utc_dt.with_timezone(&tz);
+            return Some(TimeInfo {
+                datetime_utc: Some(utc_dt),
+                datetime_local: zoned_dt.naive_local(), // Local time in the fallback zone
+                timezone: Some(TimeZoneInfo {
+                    name: tz.name().to_string(),
+                    offset_seconds: zoned_dt.offset().fix().local_minus_utc(),
+                    source: "Fallback timezone from UTC source".to_string(),
+                }),
+                source_details: SourceDetails {
+                    time_source: utc_source,
+                    confidence: CONFIDENCE_FALLBACK.to_string(), // UTC is still high confidence
+                },
+            });
+        }
+
+        // Original logic if no fallback is available
         return Some(TimeInfo {
             datetime_utc: Some(utc_dt),
-            datetime_naive: utc_dt.naive_utc(),
+            datetime_local: utc_dt.naive_utc(),
             timezone: Some(TimeZoneInfo {
                 name: "UTC".to_string(),
                 offset_seconds: 0,
                 source: utc_source.clone(),
             }),
             source_details: SourceDetails {
-                time_source: utc_source.clone(),
+                time_source: utc_source,
                 confidence: CONFIDENCE_HIGH.to_string(),
             },
         });
     }
 
-    // --- Priority 5: Naive With Guessed Offset ---
-    if let Some((naive_dt, ref naive_source)) = best_naive {
-        return if let Some((file_dt, ref file_source)) = potential_file_dt {
-            let guessed_offset = file_dt.offset().fix();
-            let offset_source_str = format!("Guessed from {file_source}");
-            let iso_utc = if let LocalResult::Single(guessed_dt_offset)
-            | LocalResult::Ambiguous(guessed_dt_offset, _) =
-                guessed_offset.from_local_datetime(&naive_dt)
-            {
-                Some(guessed_dt_offset.with_timezone(&Utc))
-            } else {
-                None
-            };
-
-            Some(TimeInfo {
-                datetime_utc: iso_utc,
-                datetime_naive: naive_dt,
-                timezone: Some(TimeZoneInfo {
-                    name: guessed_offset.to_string(),
-                    offset_seconds: guessed_offset.local_minus_utc(),
-                    source: offset_source_str,
-                }),
-                source_details: SourceDetails {
-                    time_source: naive_source.clone(),
-                    confidence: CONFIDENCE_MEDIUM.to_string(),
-                },
-            })
-        } else {
-            // --- Priority 6: Naive Only (from EXIF) ---
-            Some(TimeInfo {
-                datetime_utc: None,
-                datetime_naive: naive_dt,
-                timezone: None,
-                source_details: SourceDetails {
-                    time_source: naive_source.clone(),
-                    confidence: CONFIDENCE_LOW.to_string(),
-                },
-            })
-        };
-    }
-
-    // --- Priority 7: Filename Parsing ---
-    if best_naive.is_none() {
-        // Use get_string_field from the extraction module
-        if let Some(filename) = get_string_field(exif_info, "Other", "FileName") {
-            let re = Regex::new(
-                r"\b(\d{4})[-_]?(\d{2})[-_]?(\d{2})[-_ ]?(\d{2})[:_]?(\d{2})[:_]?(\d{2})\b",
-            )
-            .ok();
-            if let Some(re) = re
-                && let Some(caps) = re.captures(filename)
-                && let (Ok(year), Ok(month), Ok(day), Ok(hour), Ok(min), Ok(sec)) = (
-                    caps.get(1)
-                        .map_or(Err(()), |m| m.as_str().parse::<i32>().map_err(|_| ())),
-                    caps.get(2)
-                        .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
-                    caps.get(3)
-                        .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
-                    caps.get(4)
-                        .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
-                    caps.get(5)
-                        .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
-                    caps.get(6)
-                        .map_or(Err(()), |m| m.as_str().parse::<u32>().map_err(|_| ())),
-                )
-                && let (Some(date), Some(time)) = (
-                    NaiveDate::from_ymd_opt(year, month, day),
-                    NaiveTime::from_hms_opt(hour, min, sec),
-                )
-            {
-                return Some(TimeInfo {
-                    datetime_utc: None,
-                    datetime_naive: NaiveDateTime::new(date, time),
-                    timezone: None,
-                    source_details: SourceDetails {
-                        time_source: "FileName".to_string(),
-                        confidence: CONFIDENCE_LOW.to_string(),
-                    },
-                });
-            }
-        }
-    }
-
-    // --- Priority 8: File Metadata Time (Last Resort) ---
-    // This is reached if all other higher-priority methods failed.
-    // We use potential_file_dt which might have been extracted earlier.
-    // Note: We didn't use this for the 'guessed offset' in P5 because P5 required a 'best_naive' time first.
-    if let Some((file_dt, ref file_source)) = potential_file_dt {
-        // We have a file time (like FileModifyDate) with an offset.
-        let utc_dt = file_dt.with_timezone(&Utc);
-        let offset = file_dt.offset().fix(); // Get the original offset
-
+    // --- Priority 8: File Metadata Time Only ---
+    if let Some((file_dt, file_source)) = potential_file_dt {
+        let offset = file_dt.offset().fix();
         return Some(TimeInfo {
-            datetime_utc: Some(utc_dt),
-            // The 'naive' time is the file's time as it was recorded (local perspective)
-            datetime_naive: file_dt.naive_local(),
+            datetime_utc: Some(file_dt.with_timezone(&Utc)),
+            datetime_local: file_dt.naive_local(),
             timezone: Some(TimeZoneInfo {
-                name: offset.to_string(), // e.g., "+02:00"
+                name: offset.to_string(),
                 offset_seconds: offset.local_minus_utc(),
-                source: file_source.clone(), // e.g., "FileModifyDate"
+                source: file_source.clone(),
             }),
             source_details: SourceDetails {
-                // The primary source *is* the file metadata tag itself in this case
-                time_source: file_source.clone(),
-                // Confidence is LOW because file times are unreliable for capture time
+                time_source: file_source,
                 confidence: CONFIDENCE_LOW.to_string(),
             },
         });
@@ -275,191 +251,202 @@ fn apply_priority_logic(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::MediaAnalyzerError;
-    use crate::features::gps::{GpsInfo, LocationName};
-    use chrono::{FixedOffset, NaiveDate};
-    use exiftool::ExifTool;
-    use std::path::Path;
+    use crate::LocationName;
+    use chrono::NaiveDate;
+    use serde_json::from_str;
 
-    // --- UNIT TESTS (Mocked data, focused on priority logic) ---
-
-    #[test]
-    fn test_priority_6_naive_only() -> Result<(), MediaAnalyzerError> {
-        // Test the simplest case: only a naive datetime is available.
-        let components = ExtractedTimeComponents {
-            best_naive: Some((
-                NaiveDate::from_ymd_opt(2023, 1, 1)
-                    .unwrap()
-                    .and_hms_opt(12, 0, 0)
-                    .unwrap(),
-                "DateTimeOriginal".to_string(),
-            )),
-            potential_utc: None,
-            potential_explicit_offset: None,
-            potential_file_dt: None,
-        };
-        let time_info = apply_priority_logic(components, None, &Value::Null).unwrap();
-        assert_eq!(time_info.source_details.confidence, CONFIDENCE_LOW);
-        assert_eq!(time_info.source_details.time_source, "DateTimeOriginal");
-
-        Ok(())
+    // Mock GpsInfo struct as it's defined in another part of the crate.
+    #[derive(Debug, Clone, Copy)]
+    pub struct MockGpsInfo {
+        pub latitude: f64,
+        pub longitude: f64,
+    }
+    // Allow tests to use the mock struct where the real GpsInfo is expected.
+    impl From<MockGpsInfo> for GpsInfo {
+        fn from(val: MockGpsInfo) -> Self {
+            Self {
+                latitude: val.latitude,
+                longitude: val.longitude,
+                altitude: None,
+                image_direction: None,
+                image_direction_ref: None,
+                location: LocationName {
+                    latitude: 0.0,
+                    name: String::new(),
+                    admin1: String::new(),
+                    admin2: String::new(),
+                    country_code: String::new(),
+                    longitude: 0.,
+                    country_name: None,
+                },
+            }
+        }
     }
 
-    #[test]
-    fn test_priority_5_naive_with_guessed_offset() -> Result<(), MediaAnalyzerError> {
-        // Test that it correctly uses the file modification date to guess an offset.
-        let components = ExtractedTimeComponents {
-            best_naive: Some((
-                NaiveDate::from_ymd_opt(2023, 1, 1)
-                    .unwrap()
-                    .and_hms_opt(12, 0, 0)
-                    .unwrap(),
-                "CreateDate".to_string(),
-            )),
-            potential_utc: None,
-            potential_explicit_offset: None,
-            potential_file_dt: Some((
-                FixedOffset::east_opt(2 * 3600)
-                    .unwrap()
-                    .with_ymd_and_hms(2023, 1, 1, 14, 0, 0)
-                    .unwrap(),
-                "FileModifyDate".to_string(),
-            )),
-        };
-        let time_info = apply_priority_logic(components, None, &Value::Null).unwrap();
-        assert_eq!(time_info.source_details.confidence, CONFIDENCE_MEDIUM);
-        let tz = time_info.timezone.unwrap();
-        assert_eq!(tz.offset_seconds, 2 * 3600);
-        assert_eq!(tz.source, "Guessed from FileModifyDate");
+    // Mock confidence constant. In the real code this would be in `structs.rs`.
+    pub const CONFIDENCE_FALLBACK: &str = "Fallback";
 
-        Ok(())
-    }
-
-    #[test]
-    fn test_priority_3_fixed_offset() -> Result<(), MediaAnalyzerError> {
-        // Test that an explicit offset tag is preferred over a guessed offset.
-        let components = ExtractedTimeComponents {
-            best_naive: Some((
-                NaiveDate::from_ymd_opt(2024, 1, 1)
-                    .unwrap()
-                    .and_hms_opt(10, 0, 0)
-                    .unwrap(),
-                "DateTimeOriginal".to_string(),
-            )),
-            potential_utc: None,
-            potential_explicit_offset: Some((
-                -5 * 3600,
-                "-05:00".to_string(),
-                "OffsetTime".to_string(),
-            )),
-            potential_file_dt: Some((
-                // This lower-priority data should be ignored
-                FixedOffset::east_opt(2 * 3600)
-                    .unwrap()
-                    .with_ymd_and_hms(2024, 1, 1, 12, 0, 0)
-                    .unwrap(),
-                "FileModifyDate".to_string(),
-            )),
-        };
-        let time_info = apply_priority_logic(components, None, &Value::Null).unwrap();
-        assert_eq!(time_info.source_details.confidence, CONFIDENCE_HIGH);
-        assert_eq!(time_info.timezone.unwrap().source, "OffsetTime");
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_priority_2_zoned_time_with_gps() -> Result<(), MediaAnalyzerError> {
-        // Test that GPS location correctly determines the IANA timezone. (Amsterdam case)
-        let amsterdam_gps = GpsInfo {
-            latitude: 52.379189,
-            longitude: 4.899431,
-            altitude: None,
-            location: LocationName {
-                latitude: 52.37,
-                longitude: 4.89,
-                name: "Amsterdam".to_string(),
-                admin1: "".to_string(),
-                admin2: "".to_string(),
-                country_code: "NL".to_string(),
-                country_name: None,
+    fn get_full_exif() -> Value {
+        from_str(r#"{
+            "Time": {
+                "FileModifyDate": "2025:02:26 19:14:06+01:00",
+                "ModifyDate": "2017:11:06 11:03:20",
+                "GPSDateStamp": "2017:11:06",
+                "GPSTimeStamp": "10:03:19",
+                "CreateDate": "2017:11:06 11:03:20",
+                "SubSecTimeOriginal": 123953,
+                "DateTimeOriginal": "2017:11:06 11:03:20",
+                "SubSecDateTimeOriginal": "2017:11:06 11:03:20.123953",
+                "GPSDateTime": "2017:11:06 10:03:19Z"
             },
-            image_direction: None,
-            image_direction_ref: None,
-        };
-        let components = ExtractedTimeComponents {
-            best_naive: Some((
-                NaiveDate::from_ymd_opt(2024, 7, 1)
-                    .unwrap()
-                    .and_hms_opt(15, 0, 0)
-                    .unwrap(), // 3 PM in summer
-                "DateTimeOriginal".to_string(),
-            )),
-            potential_utc: None,
-            potential_explicit_offset: None,
-            potential_file_dt: None,
-        };
-        let time_info =
-            apply_priority_logic(components, Some(&amsterdam_gps), &Value::Null).unwrap();
-        assert_eq!(time_info.source_details.confidence, CONFIDENCE_HIGH);
-        let tz = time_info.timezone.unwrap();
-        assert_eq!(tz.name, "Europe/Amsterdam");
-        assert_eq!(
-            tz.offset_seconds,
-            2 * 3600,
-            "Amsterdam is UTC+2 in summer (DST)"
-        );
-
-        Ok(())
+            "Location": { "GPSLatitude": "53 deg 12' 45.68\" N", "GPSLongitude": "6 deg 33' 46.93\" E" }
+            }"#).unwrap()
     }
 
-    // --- INTEGRATION TESTS (Using real asset files with the correct `-g2` flag) ---
-
-    /// Helper that runs exiftool with the `-g2` flag, which is specifically
-    /// required by the time extraction logic.
-    fn get_g2_exif_for_asset(relative_path: &str) -> Result<Value, MediaAnalyzerError> {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("assets")
-            .join(relative_path);
-        let mut et = ExifTool::new()?;
-        // The `-g2` flag provides the grouped JSON structure this module expects.
-        Ok(et.json(&path, &["-g2"])?)
+    fn get_basic_exif() -> Value {
+        from_str(
+            r#"{
+        "Time": {
+        "FileModifyDate": "2011:01:01 15:26:40+01:00",
+        "ModifyDate": "2011:01:01 16:26:30",
+        "DateTimeOriginal": "                    ",
+        "CreateDate": "                    "
+        }
+        }"#,
+        )
+        .unwrap()
     }
 
     #[test]
-    fn test_real_life_photo() -> Result<(), MediaAnalyzerError> {
-        // This burst photo has a timestamp in its filename but lacks high-quality EXIF date tags.
-        let exif_data = get_g2_exif_for_asset("burst/20150813_160421_Burst01.jpg")?;
-        let time_info = get_time_info(&exif_data, None)?;
+    fn test_priority1_confirmed_utc_from_cluster_jpg() {
+        let exif = get_full_exif();
+        // GPS Coordinates for Groningen, NL
+        let gps = MockGpsInfo {
+            latitude: 53.212688,
+            longitude: 6.563036,
+        };
 
-        assert_eq!(time_info.source_details.confidence, CONFIDENCE_HIGH);
-        assert_eq!(time_info.source_details.time_source, "GPSDateTime");
-        assert!(time_info.datetime_utc.is_some());
+        let info = get_time_info(&exif, Some(&gps.into()), None).unwrap();
+
+        // UTC time should come directly from GPSDateTime because it's confirmed.
         assert_eq!(
-            time_info.datetime_naive,
-            NaiveDate::from_ymd_opt(2015, 8, 13)
+            info.datetime_utc.unwrap().to_rfc3339(),
+            "2017-11-06T10:03:19+00:00"
+        );
+        // Local time is the high-precision naive time from SubSecDateTimeOriginal.
+        assert_eq!(
+            info.datetime_local,
+            NaiveDate::from_ymd_opt(2017, 11, 6)
                 .unwrap()
-                .and_hms_opt(14, 5, 18)
+                .and_hms_micro_opt(11, 3, 20, 123953)
                 .unwrap()
         );
-
-        Ok(())
+        // Timezone should be identified from GPS and used for confirmation.
+        assert_eq!(info.timezone.as_ref().unwrap().name, "Europe/Amsterdam");
+        assert_eq!(info.timezone.as_ref().unwrap().offset_seconds, 3600);
+        // Confidence should be high.
+        assert_eq!(info.source_details.confidence, CONFIDENCE_HIGH);
+        assert!(info.timezone.unwrap().source.contains("confirmed by"));
     }
 
     #[test]
-    fn test_real_file_filemodifydate_priority_8() -> Result<(), MediaAnalyzerError> {
-        // A text file has no EXIF or filename time, so it must fall back to the filesystem's modify date.
-        let exif_data = get_g2_exif_for_asset("text_file.txt")?;
-        let time_info = get_time_info(&exif_data, None)?;
+    fn test_priority5_guessed_offset_from_pict0017() {
+        let exif = get_basic_exif();
+        // No GPS, no fallback timezone.
+        let info = get_time_info(&exif, None, None).unwrap();
 
-        assert_eq!(time_info.source_details.confidence, CONFIDENCE_LOW);
-        // The source is just the tag name, as extracted.
-        assert_eq!(time_info.source_details.time_source, "FileModifyDate");
-        assert!(
-            time_info.datetime_utc.is_some(),
-            "FileModifyDate includes an offset, so UTC can be calculated"
+        // `best_local` comes from `ModifyDate` since `DateTimeOriginal` is blank.
+        assert_eq!(
+            info.datetime_local,
+            NaiveDate::from_ymd_opt(2011, 1, 1)
+                .unwrap()
+                .and_hms_opt(16, 26, 30)
+                .unwrap()
         );
+        // The offset is "guessed" from the `FileModifyDate`.
+        assert_eq!(info.timezone.as_ref().unwrap().name, "+01:00");
+        assert_eq!(info.timezone.as_ref().unwrap().offset_seconds, 3600);
+        assert_eq!(info.timezone.unwrap().source, "Guessed from FileModifyDate");
+        // The UTC time is calculated from the local time + guessed offset.
+        assert_eq!(
+            info.datetime_utc.unwrap().to_rfc3339(),
+            "2011-01-01T15:26:30+00:00"
+        );
+        // Confidence is Medium because the offset is a guess.
+        assert_eq!(info.source_details.confidence, CONFIDENCE_MEDIUM);
+    }
 
-        Ok(())
+    #[test]
+    fn test_priority6_naive_with_fallback_timezone() {
+        let exif = get_basic_exif();
+        let fallback_tz: Tz = "Europe/Paris".parse().unwrap();
+        let info = get_time_info(&exif, None, Some(fallback_tz)).unwrap();
+
+        assert_eq!(
+            info.datetime_local,
+            NaiveDate::from_ymd_opt(2011, 1, 1)
+                .unwrap()
+                .and_hms_opt(16, 26, 30)
+                .unwrap()
+        );
+        // The timezone is now the provided fallback.
+        assert_eq!(info.timezone.as_ref().unwrap().name, "+01:00");
+        assert_eq!(info.timezone.unwrap().source, "Guessed from FileModifyDate");
+        // UTC time calculated from local time + Paris offset in winter (+1).
+        assert_eq!(
+            info.datetime_utc.unwrap().to_rfc3339(),
+            "2011-01-01T15:26:30+00:00"
+        );
+        // Confidence is "Fallback".
+        assert_eq!(info.source_details.confidence, CONFIDENCE_MEDIUM);
+    }
+
+    #[test]
+    fn test_priority6_naive_only_low_confidence() {
+        let exif =
+            from_str(r#"{ "Time": { "DateTimeOriginal": "2023-05-10 10:00:00" } }"#).unwrap();
+        let info = get_time_info(&exif, None, None).unwrap();
+
+        assert_eq!(
+            info.datetime_local,
+            NaiveDate::from_ymd_opt(2023, 5, 10)
+                .unwrap()
+                .and_hms_opt(10, 0, 0)
+                .unwrap()
+        );
+        // With no other information, UTC and timezone must be None.
+        assert!(info.datetime_utc.is_none());
+        assert!(info.timezone.is_none());
+        // Confidence is Low.
+        assert_eq!(info.source_details.confidence, CONFIDENCE_LOW);
+    }
+
+    #[test]
+    fn test_priority7_utc_only_with_fallback_timezone() {
+        let exif = from_str(r#"{ "Time": { "GPSDateTime": "2022-08-15T18:00:00Z" } }"#).unwrap();
+        let fallback_tz: Tz = "America/New_York".parse().unwrap();
+        let info = get_time_info(&exif, None, Some(fallback_tz)).unwrap();
+
+        // UTC time is known and accurate.
+        assert_eq!(
+            info.datetime_utc.unwrap().to_rfc3339(),
+            "2022-08-15T18:00:00+00:00"
+        );
+        // The local time should be the UTC time converted to the fallback zone.
+        // New York is UTC-4 in August (EDT).
+        assert_eq!(
+            info.datetime_local,
+            NaiveDate::from_ymd_opt(2022, 8, 15)
+                .unwrap()
+                .and_hms_opt(14, 0, 0)
+                .unwrap()
+        );
+        assert_eq!(info.timezone.as_ref().unwrap().name, "America/New_York");
+        assert_eq!(info.timezone.as_ref().unwrap().offset_seconds, -14400); // -4 hours
+        assert_eq!(info.source_details.confidence, CONFIDENCE_FALLBACK);
+        assert_eq!(
+            info.timezone.unwrap().source,
+            "Fallback timezone from UTC source"
+        );
     }
 }

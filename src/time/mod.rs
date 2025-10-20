@@ -1,6 +1,7 @@
 //! Module for extracting and consolidating time information from media metadata.
 pub mod error;
 mod extraction;
+mod filename_parsing;
 mod logic;
 mod parsing;
 pub mod structs;

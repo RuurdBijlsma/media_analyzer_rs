@@ -12,12 +12,12 @@ pub struct TimeInfo {
 
     /// The best available "naive" timestamp (without timezone context) found in the metadata.
     /// This often corresponds to the camera's local time setting when the picture was taken.
-    pub datetime_naive: NaiveDateTime,
+    pub datetime_local: NaiveDateTime,
 
-    /// Details about the timezone context associated with `datetime_naive`, if determined.
+    /// Details about the timezone context associated with `datetime_local`, if determined.
     pub timezone: Option<TimeZoneInfo>,
 
-    /// Information about how the time components (`datetime_naive`, `timezone`) were derived
+    /// Information about how the time components were derived
     /// and the overall confidence level.
     pub source_details: SourceDetails,
 }
@@ -30,7 +30,7 @@ pub struct TimeZoneInfo {
     /// Can be an IANA name (e.g., "Europe/Bucharest"), a fixed offset string (e.g., "+03:00"),
     /// or simply "UTC".
     pub name: String,
-    /// The offset from UTC in seconds *at the specific `datetime_naive`*.
+    /// The offset from UTC in seconds.
     /// For IANA zones, this accounts for DST at that time.
     pub offset_seconds: i32,
     /// Describes how the timezone information was obtained (e.g., "IANA from GPS", "`OffsetTimeOriginal`").
@@ -41,8 +41,6 @@ pub struct TimeZoneInfo {
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceDetails {
-    /// The primary EXIF tag or method used to determine `datetime_naive`
-    /// (e.g., "`DateTimeOriginal`", "`GPSDateTime`", "`FileName`").
     pub time_source: String,
     /// An indicator of the overall reliability of the `TimeInfo` structure,
     /// especially the `datetime_utc` and `timezone` fields.
@@ -50,6 +48,7 @@ pub struct SourceDetails {
 }
 
 // Confidence level constants
+pub const CONFIDENCE_FALLBACK: &str = "Fallback"; // Fallback tz used
 pub const CONFIDENCE_HIGH: &str = "High"; // GPS UTC, Confirmed UTC, Zoned, Explicit Fixed Offset
 pub const CONFIDENCE_MEDIUM: &str = "Medium"; // Naive + Guessed Offset
 pub const CONFIDENCE_LOW: &str = "Low"; // Naive Only, Filename
