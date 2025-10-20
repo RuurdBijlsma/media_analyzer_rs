@@ -48,6 +48,7 @@ pub struct SourceDetails {
 }
 
 // Confidence level constants
+pub const CONFIDENCE_FALLBACK: &str = "Fallback"; // Fallback tz used
 pub const CONFIDENCE_HIGH: &str = "High"; // GPS UTC, Confirmed UTC, Zoned, Explicit Fixed Offset
 pub const CONFIDENCE_MEDIUM: &str = "Medium"; // Naive + Guessed Offset
 pub const CONFIDENCE_LOW: &str = "Low"; // Naive Only, Filename
