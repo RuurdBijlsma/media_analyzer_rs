@@ -20,23 +20,20 @@ pub fn extract_tags(path: &Path, exif: &Value) -> TagData {
     let is_night_sight = filename_lower.contains("night");
 
     // --- Tags from EXIF data ---
-
     let is_motion_photo = exif
         .get("MotionPhoto")
-        .and_then(|x| x.as_i64())
-        .map(|x| x == 1)
-        .unwrap_or(false);
+        .and_then(Value::as_i64)
+        .is_some_and(|x| x == 1);
 
     let motion_photo_presentation_timestamp = exif
         .get("MotionPhotoPresentationTimestampUs")
-        .and_then(|x| x.as_i64());
+        .and_then(Value::as_i64);
 
     // --- Video Detection ---
     let is_video = exif
         .get("MIMEType")
         .and_then(|m| m.as_str())
-        .map(|s| s.starts_with("video/"))
-        .unwrap_or(false);
+        .is_some_and(|s| s.starts_with("video/"));
 
     let is_hdr = detect_hdr(exif);
 
@@ -49,32 +46,46 @@ pub fn extract_tags(path: &Path, exif: &Value) -> TagData {
         _ => false,
     };
 
-    let is_timelapse = if let Some(user_comment) = exif.get("UserComment").and_then(|c| c.as_str())
-    {
-        let comment = user_comment.to_lowercase();
-        comment.contains("time-lapse") || comment.contains("hyperlapse")
-    } else if let Some(description) = exif.get("Description").and_then(|d| d.as_str()) {
-        let desc = description.to_lowercase();
-        desc.contains("time-lapse") || desc.contains("hyperlapse")
-    } else if let Some(special_type) = exif.get("SpecialTypeID").and_then(|s| s.as_str()) {
-        special_type.to_lowercase().contains("timelapse")
-    } else {
-        matches!(video_fps, Some(v_fps) if v_fps < 10.0)
-    };
+    let is_timelapse = exif
+        .get("UserComment")
+        .and_then(|c| c.as_str())
+        .map_or_else(
+            || {
+                exif.get("Description")
+                    .and_then(|d| d.as_str())
+                    .map_or_else(
+                        || {
+                            // FIX APPLIED HERE: Replaced if let/else with map_or
+                            exif.get("SpecialTypeID").and_then(|s| s.as_str()).map_or(
+                                matches!(video_fps, Some(v_fps) if v_fps < 10.0),
+                                |special_type| special_type.to_lowercase().contains("timelapse"),
+                            )
+                        },
+                        |description| {
+                            let desc = description.to_lowercase();
+                            desc.contains("time-lapse") || desc.contains("hyperlapse")
+                        },
+                    )
+            },
+            |user_comment| {
+                let comment = user_comment.to_lowercase();
+                comment.contains("time-lapse") || comment.contains("hyperlapse")
+            },
+        );
 
     // --- Construct and return the final struct ---
     TagData {
-        is_video,
-        capture_fps,
-        video_fps,
+        is_motion_photo,
+        motion_photo_presentation_timestamp,
+        is_night_sight,
         is_hdr,
         is_burst,
         burst_id,
         is_timelapse,
         is_slowmotion,
-        is_night_sight,
-        is_motion_photo,
-        motion_photo_presentation_timestamp,
+        is_video,
+        capture_fps,
+        video_fps,
     }
 }
 

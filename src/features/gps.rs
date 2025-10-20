@@ -2,7 +2,7 @@ use reverse_geocoder::ReverseGeocoder;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum DirectionRef {
     TrueNorth,
     MagneticNorth,
@@ -32,12 +32,11 @@ pub struct LocationName {
 }
 
 pub async fn get_gps_info(geocoder: &ReverseGeocoder, numeric_exif: &Value) -> Option<GpsInfo> {
-    let (latitude, longitude) = match (
+    let (Some(latitude), Some(longitude)) = (
         numeric_exif.get("GPSLatitude").and_then(Value::as_f64),
         numeric_exif.get("GPSLongitude").and_then(Value::as_f64),
-    ) {
-        (Some(lat), Some(lon)) => (lat, lon),
-        _ => return None,
+    ) else {
+        return None;
     };
     let altitude = numeric_exif.get("GPSAltitude").and_then(Value::as_f64);
     let image_direction = numeric_exif.get("GPSImgDirection").and_then(Value::as_f64);

@@ -1,6 +1,6 @@
 [package]
 name = "media_analyzer"
-version = "0.2.4"
+version = "0.3.0"
 edition = "2024"
 license = "Apache-2.0"
 description = "Extract file-based information from photo and video files."
@@ -27,12 +27,8 @@ tokio = { version = "1.44.2", features = ["full"] }
 serde = { version = "1.0.219", features = ["derive"] }
 chrono = { version = "0.4.41", features = ["serde"] }
 chrono-tz = "0.10.3"
-once_cell = "1.21.3"
 tzf-rs = { version = "1.0.0" }
 rand = "0.10.0-rc.0"
-base64 = "0.22.1"
-mime_guess = "2.0.5"
-lazy_static = "1.5.0"
 bon = "3.7.2"
 sunrise = "2.1.0"
 reverse_geocoder = "4.1.1"
