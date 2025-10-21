@@ -7,6 +7,7 @@ use serde_json::Value;
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AnalyzeResult {
+    pub hash: String,
     pub exif: Value,
     pub metadata: FileMetadata,
     pub capture_details: CaptureDetails,

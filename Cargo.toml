@@ -1,6 +1,6 @@
 [package]
 name = "media_analyzer"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 license = "Apache-2.0"
 description = "Extract file-based information from photo and video files."
@@ -20,21 +20,21 @@ categories = ["multimedia::images", "multimedia::video"]
 
 [dependencies]
 exiftool = "0.2.6"
-meteostat = "0.4.4"
-regex = "1.11.1"
+meteostat = "0.4.5"
+regex = "1.12.2"
 serde_json = "1.0.140"
-tokio = { version = "1.44.2", features = ["full"] }
-serde = { version = "1.0.219", features = ["derive"] }
+tokio = { version = "1.48.0", features = ["full"] }
+serde = { version = "1.0.228", features = ["derive"] }
 chrono = { version = "0.4.41", features = ["serde"] }
 chrono-tz = "0.10.3"
-tzf-rs = { version = "1.0.0" }
+tzf-rs = { version = "1.1.3" }
 rand = "0.10.0-rc.0"
-bon = "3.7.2"
+bon = "3.8.1"
 sunrise = "2.1.0"
 reverse_geocoder = "4.1.1"
 rust_iso3166 = "0.1.14"
 thiserror = "2.0.17"
-
+blake3 = { version = "1.8.2", features = ["mmap", "rayon"] }
 
 [dev-dependencies]
 criterion = "0.7.0"
