@@ -1,6 +1,7 @@
 use crate::MediaAnalyzerError;
 use crate::features::error::WeatherError;
 use crate::features::gps::get_gps_info;
+use crate::features::hashing::hash_file;
 use crate::features::metadata::get_metadata;
 use crate::features::pano::get_pano_info;
 use crate::features::weather::get_weather_info;
@@ -149,6 +150,7 @@ impl MediaAnalyzer {
         &mut self,
         media_file: &Path,
     ) -> Result<AnalyzeResult, MediaAnalyzerError> {
+        let hash = hash_file(media_file)?;
         let exif_info = self.exiftool.json(media_file, &["-g2"])?;
         let numeric_exif = self.exiftool.json(media_file, &["-n"])?;
 
@@ -174,6 +176,7 @@ impl MediaAnalyzer {
         let weather_info = weather_info.ok();
 
         Ok(AnalyzeResult {
+            hash,
             exif: exif_info,
             tags,
             time_info,
