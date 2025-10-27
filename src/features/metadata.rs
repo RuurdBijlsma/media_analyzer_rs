@@ -82,15 +82,14 @@ pub fn get_metadata(exif: &Value) -> Result<(FileMetadata, CaptureDetails), Meta
     ))
 }
 
-
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-    use exiftool::ExifTool;
     use super::*;
-    use crate::features::error::MetadataError;
-    use serde_json::json;
     use crate::MediaAnalyzerError;
+    use crate::features::error::MetadataError;
+    use exiftool::ExifTool;
+    use serde_json::json;
+    use std::path::Path;
 
     #[test]
     fn test_get_metadata_with_full_photo_data() {
@@ -197,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn test_orientation_tag() ->Result<(), MediaAnalyzerError> {
+    fn test_orientation_tag() -> Result<(), MediaAnalyzerError> {
         let mut et = ExifTool::new()?;
         let file = Path::new("assets/orientation-5.jpg");
         let numeric_exif = et.json(file, &["-n"])?;
