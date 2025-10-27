@@ -251,7 +251,8 @@ mod tests {
         let result = analyzer.analyze_media(&media_file).await?;
 
         // --- Assertions ---
-        assert_eq!(result.metadata.width, 4032);
+        assert_eq!(result.metadata.width, 3024);
+        assert_eq!(result.metadata.orientation, Some(6));
         assert!(!result.tags.is_video);
         assert!(!result.tags.is_hdr);
         assert!(result.gps_info.is_some(), "Should have GPS info");
