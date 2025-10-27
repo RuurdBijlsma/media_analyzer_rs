@@ -10,6 +10,7 @@ pub struct FileMetadata {
     pub mime_type: String,
     pub duration: Option<f64>,
     pub size_bytes: u64,
+    pub orientation: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
@@ -23,80 +24,60 @@ pub struct CaptureDetails {
     pub camera_model: Option<String>,
 }
 
-pub fn get_metadata(exif_data: &Value) -> Result<(FileMetadata, CaptureDetails), MetadataError> {
-    // Reusable helper closures
-    let get_u64 = |key: &str| -> Result<u64, MetadataError> {
-        exif_data
-            .get(key)
-            .and_then(Value::as_u64)
-            .ok_or_else(|| MetadataError::MissingRequiredField(key.to_string()))
-    };
+fn get_required_u64(exif: &Value, key: &str) -> Result<u64, MetadataError> {
+    exif.get(key)
+        .and_then(Value::as_u64)
+        .ok_or_else(|| MetadataError::MissingRequiredField(key.to_string()))
+}
 
-    let get_string = |key: &str| -> Result<String, MetadataError> {
-        exif_data
-            .get(key)
-            .and_then(Value::as_str)
-            .map(String::from)
-            .ok_or_else(|| MetadataError::MissingRequiredField(key.to_string()))
-    };
-
-    // --- These fields are required, so we use '?' ---
-    let width = get_u64("ImageWidth")?;
-    let height = get_u64("ImageHeight")?;
-    let mime_type = get_string("MIMEType")?;
-    let size_bytes = get_u64("FileSize")?; // Expecting file size is reasonable
-
-    // --- Optional fields use .ok() ---
-    // The Duration tag can be a number (seconds) or a string ("HH:MM:SS.fff").
-    // We need to handle both cases.
-    let duration = exif_data.get("Duration").and_then(|val| {
-        // First, try to parse it as a number (f64).
-        if let Some(d) = val.as_f64() {
-            return Some(d);
-        }
-        // If that fails, try to parse it as a "HH:MM:SS.fff" string.
-        if let Some(s) = val.as_str() {
-            let parts: Vec<f64> = s.split(':').filter_map(|p| p.parse().ok()).collect();
-            if parts.len() == 3 {
-                return Some(parts[0].mul_add(3600.0, parts[1] * 60.0) + parts[2]);
-            }
-        }
-        // If neither works, it's None.
-        None
-    });
-
-    let iso = exif_data.get("ISO").and_then(Value::as_u64);
-    // ... other optional fields ...
-    let camera_make = exif_data
-        .get("Make")
+fn get_required_string(exif: &Value, key: &str) -> Result<String, MetadataError> {
+    exif.get(key)
         .and_then(Value::as_str)
-        .map(String::from);
-    let camera_model = exif_data
-        .get("Model")
-        .and_then(Value::as_str)
-        .map(String::from);
-    let aperture = exif_data.get("Aperture").and_then(Value::as_f64);
-    let exposure_time = exif_data.get("ExposureTime").and_then(Value::as_f64);
-    let focal_length = exif_data
-        .get("FocalLengthIn35mmFormat")
-        .and_then(Value::as_f64)
-        .or_else(|| exif_data.get("FocalLength").and_then(Value::as_f64));
+        .map(str::to_owned)
+        .ok_or_else(|| MetadataError::MissingRequiredField(key.to_string()))
+}
 
+fn get_f64(exif: &Value, key: &str) -> Option<f64> {
+    exif.get(key).and_then(Value::as_f64)
+}
+
+fn get_u64(exif: &Value, key: &str) -> Option<u64> {
+    exif.get(key).and_then(Value::as_u64)
+}
+
+fn get_string(exif: &Value, key: &str) -> Option<String> {
+    exif.get(key).and_then(Value::as_str).map(str::to_owned)
+}
+
+fn parse_duration(val: &Value) -> Option<f64> {
+    if let Some(d) = val.as_f64() {
+        return Some(d);
+    }
+
+    val.as_str().and_then(|s| {
+        let parts: Vec<f64> = s.split(':').filter_map(|p| p.parse().ok()).collect();
+        (parts.len() == 3).then(|| parts[0].mul_add(3600.0, parts[1] * 60.0) + parts[2])
+    })
+}
+
+pub fn get_metadata(exif: &Value) -> Result<(FileMetadata, CaptureDetails), MetadataError> {
     Ok((
         FileMetadata {
-            width,
-            height,
-            mime_type,
-            duration,
-            size_bytes,
+            width: get_required_u64(exif, "ImageWidth")?,
+            height: get_required_u64(exif, "ImageHeight")?,
+            mime_type: get_required_string(exif, "MIMEType")?,
+            size_bytes: get_required_u64(exif, "FileSize")?,
+            orientation: get_u64(exif, "Orientation"),
+            duration: exif.get("Duration").and_then(parse_duration),
         },
         CaptureDetails {
-            iso,
-            exposure_time,
-            aperture,
-            focal_length,
-            camera_make,
-            camera_model,
+            iso: get_u64(exif, "ISO"),
+            exposure_time: get_f64(exif, "ExposureTime"),
+            aperture: get_f64(exif, "Aperture"),
+            focal_length: get_f64(exif, "FocalLengthIn35mmFormat")
+                .or_else(|| get_f64(exif, "FocalLength")),
+            camera_make: get_string(exif, "Make"),
+            camera_model: get_string(exif, "Model"),
         },
     ))
 }
@@ -104,8 +85,11 @@ pub fn get_metadata(exif_data: &Value) -> Result<(FileMetadata, CaptureDetails),
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::MediaAnalyzerError;
     use crate::features::error::MetadataError;
+    use exiftool::ExifTool;
     use serde_json::json;
+    use std::path::Path;
 
     #[test]
     fn test_get_metadata_with_full_photo_data() {
@@ -209,6 +193,18 @@ mod tests {
             metadata.duration.is_none(),
             "Malformed duration string should result in None"
         );
+    }
+
+    #[test]
+    fn test_orientation_tag() -> Result<(), MediaAnalyzerError> {
+        let mut et = ExifTool::new()?;
+        let file = Path::new("assets/orientation-5.jpg");
+        let numeric_exif = et.json(file, &["-n"])?;
+        let (metadata, _) = get_metadata(&numeric_exif)?;
+
+        assert_eq!(metadata.orientation, Some(5));
+
+        Ok(())
     }
 
     #[test]
