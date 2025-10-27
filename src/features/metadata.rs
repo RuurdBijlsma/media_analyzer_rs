@@ -61,13 +61,23 @@ fn parse_duration(val: &Value) -> Option<f64> {
 }
 
 pub fn get_metadata(exif: &Value) -> Result<(FileMetadata, CaptureDetails), MetadataError> {
+    let mut width = get_required_u64(exif, "ImageWidth")?;
+    let mut height = get_required_u64(exif, "ImageHeight")?;
+    let orientation = get_u64(exif, "Orientation");
+
+    if let Some(orientation_val) = orientation
+        && let 5..=8 = orientation_val
+    {
+        // Swap width and height for 90 and 270-degree rotations
+        std::mem::swap(&mut width, &mut height);
+    }
     Ok((
         FileMetadata {
-            width: get_required_u64(exif, "ImageWidth")?,
-            height: get_required_u64(exif, "ImageHeight")?,
+            width,
+            height,
             mime_type: get_required_string(exif, "MIMEType")?,
             size_bytes: get_required_u64(exif, "FileSize")?,
-            orientation: get_u64(exif, "Orientation"),
+            orientation,
             duration: exif.get("Duration").and_then(parse_duration),
         },
         CaptureDetails {
@@ -203,6 +213,8 @@ mod tests {
         let (metadata, _) = get_metadata(&numeric_exif)?;
 
         assert_eq!(metadata.orientation, Some(5));
+        assert_eq!(metadata.width, 1800);
+        assert_eq!(metadata.height, 1200);
 
         Ok(())
     }
