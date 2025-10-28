@@ -43,11 +43,11 @@ fn apply_priority_logic(
     } = components;
 
     // --- Priority 1: Confirmed UTC (Highest confidence) ---
-    if let (Some((naive_dt, naive_source)), Some((gps_utc_dt, utc_source)), Some(gps)) =
+    if let (Some((local_dt, naive_source)), Some((gps_utc_dt, utc_source)), Some(gps)) =
         (&best_local, &potential_utc, gps_info)
         && let Ok(tz) = Tz::from_str(FINDER.get_tz_name(gps.longitude, gps.latitude))
         && let LocalResult::Single(zoned_dt) | LocalResult::Ambiguous(zoned_dt, _) =
-            tz.from_local_datetime(naive_dt)
+            tz.from_local_datetime(local_dt)
     {
         let calculated_utc_from_naive = zoned_dt.with_timezone(&Utc);
         let diff = gps_utc_dt.signed_duration_since(calculated_utc_from_naive);
@@ -61,7 +61,7 @@ fn apply_priority_logic(
             };
             return Some(TimeInfo {
                 datetime_utc: Some(*gps_utc_dt),
-                datetime_local: *naive_dt,
+                datetime_local: *local_dt,
                 timezone: Some(tz_info),
                 source_details: SourceDetails {
                     time_source: naive_source.clone(),
@@ -71,17 +71,16 @@ fn apply_priority_logic(
         }
     }
 
-    // --- Main Logic Path: We have a candidate for local time, now find its context. ---
-    if let Some((naive_dt, naive_source)) = best_local {
+    if let Some((local_dt, naive_source)) = best_local {
         // --- Priority 2: Zoned Time (Naive + GPS Location) ---
         if let Some(gps) = gps_info
             && let Ok(tz) = Tz::from_str(FINDER.get_tz_name(gps.longitude, gps.latitude))
             && let LocalResult::Single(zoned_dt) | LocalResult::Ambiguous(zoned_dt, _) =
-                tz.from_local_datetime(&naive_dt)
+                tz.from_local_datetime(&local_dt)
         {
             return Some(TimeInfo {
                 datetime_utc: Some(zoned_dt.with_timezone(&Utc)),
-                datetime_local: naive_dt,
+                datetime_local: local_dt,
                 timezone: Some(TimeZoneInfo {
                     name: tz.name().to_string(),
                     offset_seconds: zoned_dt.offset().fix().local_minus_utc(),
@@ -98,11 +97,11 @@ fn apply_priority_logic(
         if let Some((offset_secs, offset_str, offset_source)) = potential_explicit_offset
             && let Some(offset) = FixedOffset::east_opt(offset_secs)
             && let LocalResult::Single(dt_with_offset) | LocalResult::Ambiguous(dt_with_offset, _) =
-                offset.from_local_datetime(&naive_dt)
+                offset.from_local_datetime(&local_dt)
         {
             return Some(TimeInfo {
                 datetime_utc: Some(dt_with_offset.with_timezone(&Utc)),
-                datetime_local: naive_dt,
+                datetime_local: local_dt,
                 timezone: Some(TimeZoneInfo {
                     name: offset_str,
                     offset_seconds: offset_secs,
@@ -117,12 +116,22 @@ fn apply_priority_logic(
 
         // --- Priority 4: Hybrid (Local Time + Unconfirmed UTC Time) ---
         if let Some((utc_dt, utc_source)) = potential_utc {
+            // Calculate offset in seconds between local and UTC datetimes
+            let offset_seconds = (local_dt - utc_dt.naive_utc()).num_seconds() as i32;
+
+            // Format offset as ±HH:MM
+            let sign = if offset_seconds >= 0 { '+' } else { '-' };
+            let abs_offset = offset_seconds.abs();
+            let hours = abs_offset / 3600;
+            let minutes = (abs_offset % 3600) / 60;
+            let tz_name = format!("{sign}{hours:02}:{minutes:02}");
+
             return Some(TimeInfo {
                 datetime_utc: Some(utc_dt),
-                datetime_local: naive_dt,
+                datetime_local: local_dt,
                 timezone: Some(TimeZoneInfo {
-                    name: "UTC".to_string(),
-                    offset_seconds: 0,
+                    name: tz_name,
+                    offset_seconds,
                     source: utc_source.clone(),
                 }),
                 source_details: SourceDetails {
@@ -136,13 +145,13 @@ fn apply_priority_logic(
         if let Some((file_dt, file_source)) = potential_file_dt {
             let guessed_offset = file_dt.offset().fix();
             let iso_utc = guessed_offset
-                .from_local_datetime(&naive_dt)
+                .from_local_datetime(&local_dt)
                 .single()
                 .map(|dt| dt.with_timezone(&Utc));
 
             return Some(TimeInfo {
                 datetime_utc: iso_utc,
-                datetime_local: naive_dt,
+                datetime_local: local_dt,
                 timezone: Some(TimeZoneInfo {
                     name: guessed_offset.to_string(),
                     offset_seconds: guessed_offset.local_minus_utc(),
@@ -159,11 +168,11 @@ fn apply_priority_logic(
         // If a fallback timezone is provided, we can elevate this to Medium confidence.
         if let Some(tz) = fallback_timezone
             && let LocalResult::Single(zoned_dt) | LocalResult::Ambiguous(zoned_dt, _) =
-                tz.from_local_datetime(&naive_dt)
+                tz.from_local_datetime(&local_dt)
         {
             return Some(TimeInfo {
                 datetime_utc: Some(zoned_dt.with_timezone(&Utc)),
-                datetime_local: naive_dt,
+                datetime_local: local_dt,
                 timezone: Some(TimeZoneInfo {
                     name: tz.name().to_string(),
                     offset_seconds: zoned_dt.offset().fix().local_minus_utc(),
@@ -180,7 +189,7 @@ fn apply_priority_logic(
         // we are left with just the naive time.
         return Some(TimeInfo {
             datetime_utc: None,
-            datetime_local: naive_dt,
+            datetime_local: local_dt,
             timezone: None,
             source_details: SourceDetails {
                 time_source: naive_source,
@@ -251,9 +260,13 @@ fn apply_priority_logic(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::LocationName;
+    use crate::features::gps::get_gps_info;
+    use crate::{LocationName, MediaAnalyzerError};
     use chrono::NaiveDate;
+    use exiftool::ExifTool;
+    use reverse_geocoder::ReverseGeocoder;
     use serde_json::from_str;
+    use std::path::Path;
 
     // Mock GpsInfo struct as it's defined in another part of the crate.
     #[derive(Debug, Clone, Copy)]
@@ -315,6 +328,26 @@ mod tests {
         }"#,
         )
         .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_difficult_tz_offset() -> Result<(), MediaAnalyzerError> {
+        // Arrange
+        let image = Path::new("assets/tz-offset-bug/IMG_20170904_101507.jpg");
+        let mut et = ExifTool::new()?;
+        let exif = et.json(image, &["-g2"])?;
+        let geocoder = ReverseGeocoder::new();
+        let numeric_exif = et.json(image, &["-n"])?;
+        let gps_info = get_gps_info(&geocoder, &numeric_exif).await;
+        let tz = "Europe/Amsterdam".parse::<Tz>().unwrap();
+
+        // Act
+        let time_info = get_time_info(&exif, gps_info.as_ref(), Some(tz))?;
+
+        // Assert
+        println!("{time_info:?}");
+
+        Ok(())
     }
 
     #[test]

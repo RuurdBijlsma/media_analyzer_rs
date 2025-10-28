@@ -37,11 +37,11 @@ pub fn parse_datetime_utc_z(s: &str) -> Option<DateTime<chrono::Utc>> {
     // Attempt 1: Handle the specific "YYYY:MM:DD HH:MM:SSZ" format from GPS tags.
     // We treat 'Z' as a literal suffix indicating UTC, not a timezone format code.
     if let Some(s_without_z) = s.strip_suffix('Z')
-        && let Ok(naive_dt) = NaiveDateTime::parse_from_str(s_without_z, "%Y:%m:%d %H:%M:%S")
+        && let Ok(local_dt) = NaiveDateTime::parse_from_str(s_without_z, "%Y:%m:%d %H:%M:%S")
     {
         // If the naive part parses correctly, we explicitly attach the UTC timezone.
         return Some(DateTime::<chrono::Utc>::from_naive_utc_and_offset(
-            naive_dt,
+            local_dt,
             chrono::Utc,
         ));
     }
