@@ -104,14 +104,14 @@ pub fn extract_time_components(
         }
     }
 
-    if let (Some((naive_dt, source_name)), Some((subsec_source, subsec_num))) = (
+    if let (Some((local_dt, source_name)), Some((subsec_source, subsec_num))) = (
         primary_naive_candidate.as_mut(),
         found_subsecond_number_source.as_ref(),
     ) {
         if subsec_source == "_ParsedFromString_" {
             *source_name = format!("{source_name}: Parsed SubSeconds");
         } else {
-            *naive_dt = add_subseconds_from_number(*naive_dt, *subsec_num);
+            *local_dt = add_subseconds_from_number(*local_dt, *subsec_num);
             *source_name = format!("{source_name} + {subsec_source}");
         }
     }
@@ -220,10 +220,10 @@ mod tests {
         let components = extract_time_components(&exif, Some(tz));
 
         assert!(components.best_local.is_some());
-        let (naive_dt, source) = components.best_local.unwrap();
+        let (local_dt, source) = components.best_local.unwrap();
         assert_eq!(source, "FileName");
         assert_eq!(
-            naive_dt,
+            local_dt,
             NaiveDate::from_ymd_opt(2024, 1, 1)
                 .unwrap()
                 .and_hms_opt(12, 30, 0)
@@ -243,10 +243,10 @@ mod tests {
         let components = extract_time_components(&exif, Some(tz));
 
         assert!(components.best_local.is_some());
-        let (naive_dt, source) = components.best_local.unwrap();
+        let (local_dt, source) = components.best_local.unwrap();
         assert_eq!(source, "FileName");
         assert_eq!(
-            naive_dt,
+            local_dt,
             NaiveDate::from_ymd_opt(2020, 8, 20)
                 .unwrap()
                 .and_hms_milli_opt(20, 38, 2, 906)
@@ -268,10 +268,10 @@ mod tests {
         let components = extract_time_components(&exif, None);
 
         assert!(components.best_local.is_some());
-        let (naive_dt, source) = components.best_local.unwrap();
+        let (local_dt, source) = components.best_local.unwrap();
         assert_eq!(source, "DateTimeOriginal"); // Verifies EXIF was preferred
         assert_eq!(
-            naive_dt,
+            local_dt,
             NaiveDate::from_ymd_opt(2025, 2, 2)
                 .unwrap()
                 .and_hms_opt(11, 11, 11)
@@ -292,10 +292,10 @@ mod tests {
         let components = extract_time_components(&exif, None);
         assert!(components.best_local.is_some());
 
-        let (naive_dt, source) = components.best_local.unwrap();
+        let (local_dt, source) = components.best_local.unwrap();
         assert_eq!(source, "DateTimeOriginal");
         assert_eq!(
-            naive_dt,
+            local_dt,
             NaiveDate::from_ymd_opt(2024, 2, 2)
                 .unwrap()
                 .and_hms_opt(12, 34, 56)
@@ -313,11 +313,11 @@ mod tests {
         });
 
         let components = extract_time_components(&exif, None);
-        let (naive_dt, source) = components.best_local.unwrap();
+        let (local_dt, source) = components.best_local.unwrap();
 
         assert_eq!(source, "SubSecDateTimeOriginal: Parsed SubSeconds");
         assert_eq!(
-            naive_dt,
+            local_dt,
             NaiveDate::from_ymd_opt(2024, 3, 3)
                 .unwrap()
                 .and_hms_micro_opt(11, 22, 33, 123_000)
@@ -336,12 +336,12 @@ mod tests {
         });
 
         let components = extract_time_components(&exif, None);
-        let (naive_dt, source) = components.best_local.unwrap();
+        let (local_dt, source) = components.best_local.unwrap();
 
         // Check that the source name was correctly combined
         assert_eq!(source, "DateTimeOriginal + SubSecTimeOriginal");
         assert_eq!(
-            naive_dt,
+            local_dt,
             NaiveDate::from_ymd_opt(2024, 4, 4)
                 .unwrap()
                 .and_hms_micro_opt(14, 15, 16, 456_000)
