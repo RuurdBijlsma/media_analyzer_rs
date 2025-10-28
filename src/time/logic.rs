@@ -117,7 +117,7 @@ fn apply_priority_logic(
         // --- Priority 4: Hybrid (Local Time + Unconfirmed UTC Time) ---
         if let Some((utc_dt, utc_source)) = potential_utc {
             // Calculate offset in seconds between local and UTC datetimes
-            let offset_seconds = (local_dt - utc_dt.naive_utc()).num_seconds();
+            let offset_seconds = (local_dt - utc_dt.naive_utc()).num_seconds() as i32;
 
             // Format offset as ±HH:MM
             let sign = if offset_seconds >= 0 { '+' } else { '-' };
@@ -131,7 +131,7 @@ fn apply_priority_logic(
                 datetime_local: local_dt,
                 timezone: Some(TimeZoneInfo {
                     name: tz_name,
-                    offset_seconds: offset_seconds as i32,
+                    offset_seconds,
                     source: utc_source.clone(),
                 }),
                 source_details: SourceDetails {

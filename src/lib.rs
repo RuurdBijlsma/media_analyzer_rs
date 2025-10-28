@@ -1,4 +1,4 @@
-#![allow(clippy::too_many_lines)]
+#![allow(clippy::too_many_lines, clippy::cast_possible_truncation)]
 //! # Media Analyzer
 //!
 //! A toolkit for extracting info from video and photo files.
