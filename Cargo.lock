@@ -1650,7 +1650,7 @@ dependencies = [
 
 [[package]]
 name = "media_analyzer"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "blake3",
  "bon",
