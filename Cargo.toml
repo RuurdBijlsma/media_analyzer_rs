@@ -1,6 +1,6 @@
 [package]
 name = "media_analyzer"
-version = "0.3.7"
+version = "0.3.8"
 edition = "2024"
 license = "Apache-2.0"
 description = "Extract file-based information from photo and video files."
@@ -19,7 +19,7 @@ exclude = [
 categories = ["multimedia::images", "multimedia::video"]
 
 [dependencies]
-exiftool = "0.2.6"
+exiftool = "0.3.0"
 meteostat = "0.4.5"
 regex = "1.12.2"
 serde_json = "1.0.140"
