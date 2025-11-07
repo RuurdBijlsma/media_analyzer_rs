@@ -4,8 +4,7 @@ use super::error::TimeError;
 use super::extraction::{ExtractedTimeComponents, extract_time_components};
 use crate::GpsInfo;
 use crate::time::structs::{
-    CONFIDENCE_FALLBACK, CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, SourceDetails,
-    TimeInfo, TimeZoneInfo,
+    CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, SourceDetails, TimeInfo, TimeZoneInfo,
 };
 use chrono::{FixedOffset, LocalResult, Offset, TimeZone, Utc};
 use chrono_tz::Tz;
@@ -19,13 +18,9 @@ const MAX_NAIVE_GPS_DIFF_SECONDS: i64 = 10;
 // --- Global Timezone Finder ---
 static FINDER: std::sync::LazyLock<DefaultFinder> = std::sync::LazyLock::new(DefaultFinder::new);
 
-pub fn get_time_info(
-    exif_info: &Value,
-    gps_info: Option<&GpsInfo>,
-    fallback_timezone: Option<Tz>,
-) -> Result<TimeInfo, TimeError> {
-    let components = extract_time_components(exif_info, fallback_timezone);
-    let time_result = apply_priority_logic(components, gps_info, fallback_timezone);
+pub fn get_time_info(exif_info: &Value, gps_info: Option<&GpsInfo>) -> Result<TimeInfo, TimeError> {
+    let components = extract_time_components(exif_info);
+    let time_result = apply_priority_logic(components, gps_info);
     time_result.ok_or(TimeError::Extraction)
 }
 
@@ -33,7 +28,6 @@ pub fn get_time_info(
 fn apply_priority_logic(
     components: ExtractedTimeComponents,
     gps_info: Option<&GpsInfo>,
-    fallback_timezone: Option<Tz>,
 ) -> Option<TimeInfo> {
     let ExtractedTimeComponents {
         best_local,
@@ -164,28 +158,6 @@ fn apply_priority_logic(
             });
         }
 
-        // --- Priority 6: Naive With Fallback Timezone OR Naive Only ---
-        // If a fallback timezone is provided, we can elevate this to Medium confidence.
-        if let Some(tz) = fallback_timezone
-            && let LocalResult::Single(zoned_dt) | LocalResult::Ambiguous(zoned_dt, _) =
-                tz.from_local_datetime(&local_dt)
-        {
-            return Some(TimeInfo {
-                datetime_utc: Some(zoned_dt.with_timezone(&Utc)),
-                datetime_local: local_dt,
-                timezone: Some(TimeZoneInfo {
-                    name: tz.name().to_string(),
-                    offset_seconds: zoned_dt.offset().fix().local_minus_utc(),
-                    source: "Fallback timezone".to_string(),
-                }),
-                source_details: SourceDetails {
-                    time_source: naive_source,
-                    confidence: CONFIDENCE_FALLBACK.to_string(),
-                },
-            });
-        }
-
-        // If no fallback, or if the local time was invalid in the fallback timezone,
         // we are left with just the naive time.
         return Some(TimeInfo {
             datetime_utc: None,
@@ -200,27 +172,9 @@ fn apply_priority_logic(
 
     // --- Fallback Path: No authoritative naive time was found anywhere. ---
 
-    // --- Priority 7: Accurate UTC Only ---
+    // --- Priority 7: Accurate UTC Only, no naive time available somehow. ---
     if let Some((utc_dt, utc_source)) = potential_utc {
-        // If we have a fallback timezone, we can create a better local representation.
-        if let Some(tz) = fallback_timezone {
-            let zoned_dt = utc_dt.with_timezone(&tz);
-            return Some(TimeInfo {
-                datetime_utc: Some(utc_dt),
-                datetime_local: zoned_dt.naive_local(), // Local time in the fallback zone
-                timezone: Some(TimeZoneInfo {
-                    name: tz.name().to_string(),
-                    offset_seconds: zoned_dt.offset().fix().local_minus_utc(),
-                    source: "Fallback timezone from UTC source".to_string(),
-                }),
-                source_details: SourceDetails {
-                    time_source: utc_source,
-                    confidence: CONFIDENCE_FALLBACK.to_string(), // UTC is still high confidence
-                },
-            });
-        }
-
-        // Original logic if no fallback is available
+        // No tz available
         return Some(TimeInfo {
             datetime_utc: Some(utc_dt),
             datetime_local: utc_dt.naive_utc(),
@@ -296,9 +250,6 @@ mod tests {
         }
     }
 
-    // Mock confidence constant. In the real code this would be in `structs.rs`.
-    pub const CONFIDENCE_FALLBACK: &str = "Fallback";
-
     fn get_full_exif() -> Value {
         from_str(r#"{
             "Time": {
@@ -339,10 +290,9 @@ mod tests {
         let geocoder = ReverseGeocoder::new();
         let numeric_exif = et.json(image, &["-n"])?;
         let gps_info = get_gps_info(&geocoder, &numeric_exif).await;
-        let tz = "Europe/Amsterdam".parse::<Tz>().unwrap();
 
         // Act
-        let time_info = get_time_info(&exif, gps_info.as_ref(), Some(tz))?;
+        let time_info = get_time_info(&exif, gps_info.as_ref())?;
 
         // Assert
         println!("{time_info:?}");
@@ -359,7 +309,7 @@ mod tests {
             longitude: 6.563036,
         };
 
-        let info = get_time_info(&exif, Some(&gps.into()), None).unwrap();
+        let info = get_time_info(&exif, Some(&gps.into())).unwrap();
 
         // UTC time should come directly from GPSDateTime because it's confirmed.
         assert_eq!(
@@ -386,7 +336,7 @@ mod tests {
     fn test_priority5_guessed_offset_from_pict0017() {
         let exif = get_basic_exif();
         // No GPS, no fallback timezone.
-        let info = get_time_info(&exif, None, None).unwrap();
+        let info = get_time_info(&exif, None).unwrap();
 
         // `best_local` comes from `ModifyDate` since `DateTimeOriginal` is blank.
         assert_eq!(
@@ -412,8 +362,7 @@ mod tests {
     #[test]
     fn test_priority6_naive_with_fallback_timezone() {
         let exif = get_basic_exif();
-        let fallback_tz: Tz = "Europe/Paris".parse().unwrap();
-        let info = get_time_info(&exif, None, Some(fallback_tz)).unwrap();
+        let info = get_time_info(&exif, None).unwrap();
 
         assert_eq!(
             info.datetime_local,
@@ -438,7 +387,7 @@ mod tests {
     fn test_priority6_naive_only_low_confidence() {
         let exif =
             from_str(r#"{ "Time": { "DateTimeOriginal": "2023-05-10 10:00:00" } }"#).unwrap();
-        let info = get_time_info(&exif, None, None).unwrap();
+        let info = get_time_info(&exif, None).unwrap();
 
         assert_eq!(
             info.datetime_local,
@@ -457,29 +406,23 @@ mod tests {
     #[test]
     fn test_priority7_utc_only_with_fallback_timezone() {
         let exif = from_str(r#"{ "Time": { "GPSDateTime": "2022-08-15T18:00:00Z" } }"#).unwrap();
-        let fallback_tz: Tz = "America/New_York".parse().unwrap();
-        let info = get_time_info(&exif, None, Some(fallback_tz)).unwrap();
+        let info = get_time_info(&exif, None).unwrap();
 
         // UTC time is known and accurate.
         assert_eq!(
             info.datetime_utc.unwrap().to_rfc3339(),
             "2022-08-15T18:00:00+00:00"
         );
-        // The local time should be the UTC time converted to the fallback zone.
-        // New York is UTC-4 in August (EDT).
+        // The local time should be the UTC time, since no naive time is provided at all.
         assert_eq!(
             info.datetime_local,
             NaiveDate::from_ymd_opt(2022, 8, 15)
                 .unwrap()
-                .and_hms_opt(14, 0, 0)
+                .and_hms_opt(18, 0, 0)
                 .unwrap()
         );
-        assert_eq!(info.timezone.as_ref().unwrap().name, "America/New_York");
-        assert_eq!(info.timezone.as_ref().unwrap().offset_seconds, -14400); // -4 hours
-        assert_eq!(info.source_details.confidence, CONFIDENCE_FALLBACK);
-        assert_eq!(
-            info.timezone.unwrap().source,
-            "Fallback timezone from UTC source"
-        );
+        assert_eq!(info.timezone.as_ref().unwrap().name, "UTC");
+        assert_eq!(info.timezone.as_ref().unwrap().offset_seconds, 0);
+        assert_eq!(info.timezone.unwrap().source, "GPSDateTime");
     }
 }
