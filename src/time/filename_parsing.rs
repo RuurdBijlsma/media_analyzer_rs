@@ -1,5 +1,4 @@
 use chrono::{DateTime, NaiveDateTime};
-use chrono_tz::Tz;
 use regex::Regex;
 use std::sync::OnceLock;
 
@@ -7,10 +6,7 @@ static RE_YYYYMMDD_HHMMSS: OnceLock<Regex> = OnceLock::new();
 static RE_YYYY_MM_DD_HH_MM_SS: OnceLock<Regex> = OnceLock::new();
 static RE_UNIX_MS: OnceLock<Regex> = OnceLock::new();
 
-pub fn parse_datetime_from_filename(
-    filename: &str,
-    fallback_timezone: Option<Tz>,
-) -> Option<NaiveDateTime> {
+pub fn parse_datetime_from_filename(filename: &str) -> Option<NaiveDateTime> {
     // --- Attempt 1: Standard YYYYMMDD_HHMMSS format ---
     // The `get_or_init` method ensures the Regex is compiled exactly once on its first use.
     let re1 = RE_YYYYMMDD_HHMMSS.get_or_init(|| Regex::new(r"(\d{8})_(\d{6})").unwrap());
@@ -44,12 +40,7 @@ pub fn parse_datetime_from_filename(
     if let Some(caps) = re3.captures(filename)
         && let Some(timestamp_str) = caps.get(1)
         && let Ok(ms) = timestamp_str.as_str().parse::<i64>()
-        && let Some(dt) = DateTime::from_timestamp_millis(ms).map(|d| {
-            if let Some(tz) = fallback_timezone {
-                return d.with_timezone(&tz).naive_local();
-            }
-            d.naive_utc()
-        })
+        && let Some(dt) = DateTime::from_timestamp_millis(ms).map(|d| d.naive_utc())
     {
         return Some(dt);
     }
