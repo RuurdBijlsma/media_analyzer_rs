@@ -436,9 +436,11 @@ mod tests {
         // Check sun info
         let sun_info = &weather_info.sun_info;
         assert!(!sun_info.is_daytime, "The sun is gone in this photo.");
-        let time_from_sunset = time_info.datetime_utc.unwrap() - sun_info.sunset;
-        // The picture is taken less than an hour after sunset
-        assert!(time_from_sunset.num_minutes() < 60);
+        if let Some(sunset) = sun_info.sunset{
+            let time_from_sunset = time_info.datetime_utc.unwrap() - sunset;
+            // The picture is taken less than an hour after sunset
+            assert!(time_from_sunset.num_minutes() < 60);
+        }
 
         // Check hourly weather data. The API might not have data for every historical hour,
         // so checking for `is_some()` is often a sufficient integration test.

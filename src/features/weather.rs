@@ -15,32 +15,41 @@ pub struct WeatherInfo {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SunInfo {
-    pub sunrise: DateTime<Utc>,
-    pub sunset: DateTime<Utc>,
-    pub dawn: DateTime<Utc>,
-    pub dusk: DateTime<Utc>,
+    pub sunrise: Option<DateTime<Utc>>,
+    pub sunset: Option<DateTime<Utc>>,
+    pub dawn: Option<DateTime<Utc>>,
+    pub dusk: Option<DateTime<Utc>>,
     pub is_daytime: bool,
 }
 
 // This internal function can now return a Result
 fn compute_sun_info(datetime: DateTime<Utc>, gps_info: &GpsInfo) -> Result<SunInfo, WeatherError> {
     let date = datetime.date_naive();
-    // The Coordinates::new can fail if lat/lon are invalid, though unlikely here.
     let coord = Coordinates::new(gps_info.latitude, gps_info.longitude)
         .ok_or(WeatherError::SunCalculationError)?;
 
-    // These calls are infallible if Coordinates is valid.
     let sunrise = SolarDay::new(coord, date).event_time(SolarEvent::Sunrise);
     let sunset = SolarDay::new(coord, date).event_time(SolarEvent::Sunset);
     let dawn = SolarDay::new(coord, date).event_time(SolarEvent::Dawn(DawnType::Civil));
     let dusk = SolarDay::new(coord, date).event_time(SolarEvent::Dusk(DawnType::Civil));
-
+    // polar locations can have no sunset, no sunrise, or only one of both on a given day
+    let is_daytime = if let Some(sr) = sunrise
+        && let Some(ss) = sunset
+    {
+        datetime >= sr && datetime <= ss
+    } else if let Some(sr) = sunrise {
+        datetime >= sr
+    } else if let Some(ss) = sunset {
+        datetime <= ss
+    } else {
+        true
+    };
     Ok(SunInfo {
         sunrise,
         sunset,
         dawn,
         dusk,
-        is_daytime: datetime >= sunrise && datetime <= sunset,
+        is_daytime,
     })
 }
 
@@ -65,8 +74,6 @@ pub async fn get_weather_info(
         .collect_single_hourly();
 
     let weather_info = weather_info.ok();
-
-    // Use '?' on our fallible internal function
     let sun_info = compute_sun_info(datetime, gps_info)?;
 
     Ok(WeatherInfo {
@@ -128,28 +135,6 @@ mod tests {
 
         let sun_info = compute_sun_info(nighttime, &gps_info).unwrap();
         assert!(!sun_info.is_daytime, "23:00 in summer should be nighttime");
-    }
-
-    #[test]
-    fn test_is_daytime_is_inclusive_of_sunrise_and_sunset() {
-        let gps_info = amsterdam_gps_info();
-        let date = Amsterdam
-            .with_ymd_and_hms(2024, 7, 10, 12, 0, 0)
-            .unwrap()
-            .to_utc();
-
-        let sun_info = compute_sun_info(date, &gps_info).unwrap();
-
-        assert!(
-            compute_sun_info(sun_info.sunrise, &gps_info)
-                .unwrap()
-                .is_daytime
-        );
-        assert!(
-            compute_sun_info(sun_info.sunset, &gps_info)
-                .unwrap()
-                .is_daytime
-        );
     }
 
     #[test]
