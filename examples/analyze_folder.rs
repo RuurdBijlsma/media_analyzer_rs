@@ -39,7 +39,7 @@ pub fn list_files_walkdir_filtered(
 /// Sample random photo(s) from a folder to test the media analyzer for various files.
 #[tokio::main]
 async fn main() -> Result<(), MediaAnalyzerError> {
-    let mut analyzer = MediaAnalyzer::builder().build().await?;
+    let analyzer = MediaAnalyzer::builder().build().await?;
 
     let start_dir = Path::new("E:/Backup/Photos/photos/photos");
     let all_files = list_files_walkdir_filtered(start_dir, false).unwrap();

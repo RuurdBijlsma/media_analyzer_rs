@@ -60,7 +60,7 @@
 //! #[tokio::main]
 //! async fn main() -> Result<(), MediaAnalyzerError> {
 //!     // 1. Build the analyzer. The builder allows for custom configuration.
-//!     let mut analyzer = MediaAnalyzer::builder()
+//!     let analyzer = MediaAnalyzer::builder()
 //!         .weather_search_radius_km(50.0) // Optional: configure the analyzer
 //!         .build()
 //!         .await?;

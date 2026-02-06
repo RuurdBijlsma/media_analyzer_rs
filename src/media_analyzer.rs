@@ -130,7 +130,7 @@ impl MediaAnalyzer {
     /// # use media_analyzer::{MediaAnalyzer, MediaAnalyzerError};
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), MediaAnalyzerError> {
-    /// let mut analyzer = MediaAnalyzer::builder().build().await?;
+    /// let analyzer = MediaAnalyzer::builder().build().await?;
     /// let photo_path = Path::new("assets/tent.jpg");
     ///
     /// // Analyze a photo, using the photo itself as the thumbnail source.
@@ -199,7 +199,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_full_analysis_on_standard_jpg() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("sunset.jpg");
 
         // For a photo, the thumbnail is the file itself.
@@ -219,7 +219,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_on_hdr() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("hdr.jpg");
 
         // For a photo, the thumbnail is the file itself.
@@ -239,7 +239,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_on_heic() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("iphone.HEIC");
 
         // For a photo, the thumbnail is the file itself.
@@ -260,7 +260,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_full_analysis_on_standard_video() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("video/car.webm");
 
         let result = analyzer.analyze_media(&media_file).await?;
@@ -279,7 +279,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_motion_photo_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("motion/PXL_20250103_180944831.MP.jpg");
 
         let result = analyzer.analyze_media(&media_file).await?;
@@ -297,7 +297,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_photosphere_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("photosphere.jpg");
 
         let result = analyzer.analyze_media(&media_file).await?;
@@ -315,7 +315,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_night_sight_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("night_sight/PXL_20250104_170020532.NIGHT.jpg");
 
         let result = analyzer.analyze_media(&media_file).await?;
@@ -328,7 +328,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_slow_motion_video_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("slowmotion.mp4");
         // For video tests, we can just use any jpg as a placeholder thumbnail
 
@@ -344,7 +344,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_timelapse_video_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("timelapse.mp4");
 
         let result = analyzer.analyze_media(&media_file).await?;
@@ -359,7 +359,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_analysis_fails_gracefully_for_non_media_file() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("text_file.txt");
 
         let result = analyzer.analyze_media(&media_file).await;
@@ -379,7 +379,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_detailed_gps_time_and_weather_info() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("sunset.jpg");
 
         let result = analyzer.analyze_media(&media_file).await?;
