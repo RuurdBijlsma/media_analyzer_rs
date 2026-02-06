@@ -67,7 +67,7 @@ mod tests {
         fn test_parses_json_string_fraction() {
             // Standard NTSC broadcast frame rate
             let value = json!("30000/1001");
-            assert!((parse_fps(&value).unwrap() - 29.97002997).abs() < 1e-9);
+            assert!((parse_fps(&value).unwrap() - 29.970_029_97).abs() < 1e-9);
         }
 
         #[test]

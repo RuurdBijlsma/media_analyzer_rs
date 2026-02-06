@@ -108,7 +108,7 @@ mod tests {
             "ImageWidth": 4000,
             "ImageHeight": 3000,
             "MIMEType": "image/jpeg",
-            "FileSize": 5242880, // 5 MB
+            "FileSize": 5_242_880, // 5 MB
             "ISO": 100,
             "Make": "Canon",
             "Model": "Canon EOS R5",
@@ -125,7 +125,7 @@ mod tests {
         assert_eq!(metadata.width, 4000);
         assert_eq!(metadata.height, 3000);
         assert_eq!(metadata.mime_type, "image/jpeg");
-        assert_eq!(metadata.size_bytes, 5242880);
+        assert_eq!(metadata.size_bytes, 5_242_880);
         assert!(metadata.duration.is_none());
 
         // --- Assert CaptureDetails ---
@@ -147,7 +147,7 @@ mod tests {
             "ImageWidth": 1920,
             "ImageHeight": 1080,
             "MIMEType": "video/mp4",
-            "FileSize": 15728640, // 15 MB
+            "FileSize": 15_728_640, // 15 MB
             "Duration": 10.53
         });
 
@@ -162,7 +162,7 @@ mod tests {
         assert_eq!(metadata.width, 1920);
         assert_eq!(metadata.height, 1080);
         assert_eq!(metadata.mime_type, "video/mp4");
-        assert_eq!(metadata.size_bytes, 15728640);
+        assert_eq!(metadata.size_bytes, 15_728_640);
         assert_eq!(metadata.duration, Some(10.53));
 
         // --- Assert CaptureDetails ---
@@ -179,7 +179,7 @@ mod tests {
     fn test_get_metadata_with_string_duration() {
         // Verifies the new case (e.g., from WebM files)
         let exif_data = json!({
-            "ImageWidth": 1280, "ImageHeight": 720, "MIMEType": "video/webm", "FileSize": 1000000,
+            "ImageWidth": 1280, "ImageHeight": 720, "MIMEType": "video/webm", "FileSize": 1_000_000,
             "Duration": "00:00:05.874000000"
         });
         let (metadata, _) = get_metadata(&exif_data).unwrap();
@@ -195,7 +195,7 @@ mod tests {
     fn test_get_metadata_handles_malformed_string_duration() {
         // Ensures that a bad string format doesn't cause a panic.
         let exif_data = json!({
-            "ImageWidth": 1280, "ImageHeight": 720, "MIMEType": "video/webm", "FileSize": 1000000,
+            "ImageWidth": 1280, "ImageHeight": 720, "MIMEType": "video/webm", "FileSize": 1_000_000,
             "Duration": "5 seconds"
         });
         let (metadata, _) = get_metadata(&exif_data).unwrap();
@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn test_orientation_tag() -> Result<(), MediaAnalyzerError> {
-        let mut et = ExifTool::new()?;
+        let et = ExifTool::new()?;
         let file = Path::new("assets/orientation-5.jpg");
         let numeric_exif = et.json(file, &["-n"])?;
         let (metadata, _) = get_metadata(&numeric_exif)?;

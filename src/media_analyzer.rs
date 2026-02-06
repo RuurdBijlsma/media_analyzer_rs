@@ -142,7 +142,7 @@ impl MediaAnalyzer {
     /// # }
     /// ```
     pub async fn analyze_media(
-        &mut self,
+        &self,
         media_file: &Path,
     ) -> Result<AnalyzeResult, MediaAnalyzerError> {
         let hash = hash_file(media_file)?;
@@ -391,8 +391,8 @@ mod tests {
             .expect("GPS info should be extracted for sunset.jpg");
 
         // Check coordinates (using approximate values)
-        assert!((gps_info.latitude - 40.8208875277778).abs() < 0.001);
-        assert!((gps_info.longitude - 14.4228166666667).abs() < 0.001);
+        assert!((gps_info.latitude - 40.820_887_527_777_8).abs() < 0.001);
+        assert!((gps_info.longitude - 14.422_816_666_666_7).abs() < 0.001);
 
         // Check reverse geocoded location data
         assert_eq!(gps_info.location.name, "Massa di Somma");

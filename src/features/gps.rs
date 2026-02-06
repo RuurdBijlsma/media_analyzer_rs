@@ -83,8 +83,8 @@ mod tests {
         let geocoder = ReverseGeocoder::new();
         // Simulate numeric exif data with all relevant GPS tags
         let numeric_exif = json!({
-            "GPSLatitude": 52.379189,
-            "GPSLongitude": 4.899431,
+            "GPSLatitude": 52.379_189,
+            "GPSLongitude": 4.899_431,
             "GPSAltitude": 10.5,
             "GPSImgDirection": 123.45,
             "GPSImgDirectionRef": "T"
@@ -97,8 +97,8 @@ mod tests {
         let gps_info = result.unwrap();
 
         // 2. Assert the direct values were parsed correctly
-        assert_eq!(gps_info.latitude, 52.379189);
-        assert_eq!(gps_info.longitude, 4.899431);
+        assert_eq!(gps_info.latitude, 52.379_189);
+        assert_eq!(gps_info.longitude, 4.899_431);
         assert_eq!(gps_info.altitude, Some(10.5));
         assert_eq!(gps_info.image_direction, Some(123.45));
         assert_eq!(gps_info.image_direction_ref, Some(DirectionRef::TrueNorth));
@@ -145,7 +145,7 @@ mod tests {
         let geocoder = ReverseGeocoder::new();
         // Longitude is present, but latitude is missing
         let numeric_exif = json!({
-            "GPSLongitude": 4.899431,
+            "GPSLongitude": 4.899_431,
         });
 
         let result = get_gps_info(&geocoder, &numeric_exif).await;
@@ -160,7 +160,7 @@ mod tests {
         let geocoder = ReverseGeocoder::new();
         // Latitude is present, but longitude is missing
         let numeric_exif = json!({
-            "GPSLatitude": 52.379189,
+            "GPSLatitude": 52.379_189,
         });
 
         let result = get_gps_info(&geocoder, &numeric_exif).await;

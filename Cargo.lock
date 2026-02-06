@@ -845,9 +845,9 @@ checksum = "ca81e6b4777c89fd810c25a4be2b1bd93ea034fbe58e6a75216a34c6b82c539b"
 
 [[package]]
 name = "exiftool"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c83266540c36c7a6f8c8711d6273f4c55f073cea2b21c418daaab5fba33cc61d"
+checksum = "8063e00d39c361c04099fa64dc9ad21514880181f299ea040e5cde0a8c36c0fa"
 dependencies = [
  "chrono",
  "log",
@@ -1687,7 +1687,7 @@ dependencies = [
 
 [[package]]
 name = "media_analyzer"
-version = "0.3.9"
+version = "0.4.0"
 dependencies = [
  "blake3",
  "bon",

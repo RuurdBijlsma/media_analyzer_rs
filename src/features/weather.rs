@@ -89,18 +89,18 @@ mod tests {
     use chrono::TimeZone;
     use chrono_tz::Europe::Amsterdam;
 
-    /// Helper function to create a GpsInfo struct for a known location (Amsterdam, NL).
+    /// Helper function to create a `GpsInfo` struct for a known location (Amsterdam, NL).
     fn amsterdam_gps_info() -> GpsInfo {
         GpsInfo {
-            latitude: 52.379189,
-            longitude: 4.899431,
+            latitude: 52.379_189,
+            longitude: 4.899_431,
             altitude: Some(0.0),
             location: LocationName {
-                latitude: 52.379189,
-                longitude: 4.899431,
+                latitude: 52.379_189,
+                longitude: 4.899_431,
                 name: "Amsterdam".to_string(),
                 admin1: "North Holland".to_string(),
-                admin2: "".to_string(),
+                admin2: String::new(),
                 country_code: "NL".to_string(),
                 country_name: Some("Netherlands".to_string()),
             },

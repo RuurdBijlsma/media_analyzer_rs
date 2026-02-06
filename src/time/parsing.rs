@@ -248,7 +248,7 @@ mod tests {
 
         #[test]
         fn adds_six_digit_subseconds() {
-            let dt = add_subseconds_from_number(base_dt(), 123456);
+            let dt = add_subseconds_from_number(base_dt(), 123_456);
             assert_eq!(dt.nanosecond(), 123_456_000);
         }
 
@@ -267,8 +267,8 @@ mod tests {
         #[test]
         fn handles_large_numbers_correctly() {
             // Numbers with >9 digits are truncated to nanosecond precision
-            let dt = add_subseconds_from_number(base_dt(), 1234567890);
-            assert_eq!(dt.nanosecond(), 234567890);
+            let dt = add_subseconds_from_number(base_dt(), 1_234_567_890);
+            assert_eq!(dt.nanosecond(), 234_567_890);
         }
     }
 }
