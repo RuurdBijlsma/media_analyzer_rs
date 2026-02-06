@@ -1,4 +1,8 @@
-#![allow(clippy::too_many_lines, clippy::cast_possible_truncation)]
+#![allow(
+    clippy::too_many_lines,
+    clippy::cast_possible_truncation,
+    clippy::float_cmp
+)]
 //! # Media Analyzer
 //!
 //! A toolkit for extracting info from video and photo files.
@@ -56,7 +60,7 @@
 //! #[tokio::main]
 //! async fn main() -> Result<(), MediaAnalyzerError> {
 //!     // 1. Build the analyzer. The builder allows for custom configuration.
-//!     let mut analyzer = MediaAnalyzer::builder()
+//!     let analyzer = MediaAnalyzer::builder()
 //!         .weather_search_radius_km(50.0) // Optional: configure the analyzer
 //!         .build()
 //!         .await?;

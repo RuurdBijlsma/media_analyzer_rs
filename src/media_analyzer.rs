@@ -130,7 +130,7 @@ impl MediaAnalyzer {
     /// # use media_analyzer::{MediaAnalyzer, MediaAnalyzerError};
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), MediaAnalyzerError> {
-    /// let mut analyzer = MediaAnalyzer::builder().build().await?;
+    /// let analyzer = MediaAnalyzer::builder().build().await?;
     /// let photo_path = Path::new("assets/tent.jpg");
     ///
     /// // Analyze a photo, using the photo itself as the thumbnail source.
@@ -142,7 +142,7 @@ impl MediaAnalyzer {
     /// # }
     /// ```
     pub async fn analyze_media(
-        &mut self,
+        &self,
         media_file: &Path,
     ) -> Result<AnalyzeResult, MediaAnalyzerError> {
         let hash = hash_file(media_file)?;
@@ -199,7 +199,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_full_analysis_on_standard_jpg() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("sunset.jpg");
 
         // For a photo, the thumbnail is the file itself.
@@ -219,7 +219,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_on_hdr() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("hdr.jpg");
 
         // For a photo, the thumbnail is the file itself.
@@ -239,7 +239,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_on_heic() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("iphone.HEIC");
 
         // For a photo, the thumbnail is the file itself.
@@ -260,7 +260,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_full_analysis_on_standard_video() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("video/car.webm");
 
         let result = analyzer.analyze_media(&media_file).await?;
@@ -279,7 +279,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_motion_photo_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("motion/PXL_20250103_180944831.MP.jpg");
 
         let result = analyzer.analyze_media(&media_file).await?;
@@ -297,7 +297,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_photosphere_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("photosphere.jpg");
 
         let result = analyzer.analyze_media(&media_file).await?;
@@ -315,7 +315,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_night_sight_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("night_sight/PXL_20250104_170020532.NIGHT.jpg");
 
         let result = analyzer.analyze_media(&media_file).await?;
@@ -328,7 +328,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_slow_motion_video_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("slowmotion.mp4");
         // For video tests, we can just use any jpg as a placeholder thumbnail
 
@@ -344,7 +344,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_timelapse_video_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("timelapse.mp4");
 
         let result = analyzer.analyze_media(&media_file).await?;
@@ -359,7 +359,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_analysis_fails_gracefully_for_non_media_file() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("text_file.txt");
 
         let result = analyzer.analyze_media(&media_file).await;
@@ -379,7 +379,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_detailed_gps_time_and_weather_info() -> Result<(), MediaAnalyzerError> {
-        let mut analyzer = MediaAnalyzer::builder().build().await?;
+        let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("sunset.jpg");
 
         let result = analyzer.analyze_media(&media_file).await?;
@@ -391,8 +391,8 @@ mod tests {
             .expect("GPS info should be extracted for sunset.jpg");
 
         // Check coordinates (using approximate values)
-        assert!((gps_info.latitude - 40.8208875277778).abs() < 0.001);
-        assert!((gps_info.longitude - 14.4228166666667).abs() < 0.001);
+        assert!((gps_info.latitude - 40.820_887_527_777_8).abs() < 0.001);
+        assert!((gps_info.longitude - 14.422_816_666_666_7).abs() < 0.001);
 
         // Check reverse geocoded location data
         assert_eq!(gps_info.location.name, "Massa di Somma");
@@ -436,9 +436,11 @@ mod tests {
         // Check sun info
         let sun_info = &weather_info.sun_info;
         assert!(!sun_info.is_daytime, "The sun is gone in this photo.");
-        let time_from_sunset = time_info.datetime_utc.unwrap() - sun_info.sunset;
-        // The picture is taken less than an hour after sunset
-        assert!(time_from_sunset.num_minutes() < 60);
+        if let Some(sunset) = sun_info.sunset {
+            let time_from_sunset = time_info.datetime_utc.unwrap() - sunset;
+            // The picture is taken less than an hour after sunset
+            assert!(time_from_sunset.num_minutes() < 60);
+        }
 
         // Check hourly weather data. The API might not have data for every historical hour,
         // so checking for `is_some()` is often a sufficient integration test.

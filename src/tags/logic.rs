@@ -103,12 +103,10 @@ mod tests {
             .join("assets")
             .join(relative_path);
 
-        if !path.exists() {
-            panic!("Test asset file not found at: {:?}", path);
-        }
+        assert!(path.exists(), "Test asset file not found at: {path:?}");
 
         // Use the numeric preset '-n' for all tests for consistency.
-        let mut et = ExifTool::new()?;
+        let et = ExifTool::new()?;
         let exif_data = et.json(&path, &["-n"])?;
 
         Ok(extract_tags(&path, &exif_data))

@@ -12,7 +12,7 @@ This crate provides a high-level, asynchronous API that acts as an orchestrator 
 raw metadata with intelligent parsing, geolocation, and historical weather data to produce a single, structured, and
 easy-to-use result.
 
-Example output, converted to json,
+Example output, converted to JSON,
 viewable [here](https://github.com/RuurdBijlsma/media_analyzer_rs/blob/main/.github/example_output/example_output.json).
 
 ## Prerequisites
@@ -30,17 +30,14 @@ Verify your installation by typing `exiftool -ver` in your terminal.
 
 ## Features
 
-* **🗃️ Unified Metadata:** Gathers core properties (`FileMetadata`) and photographic details (`CaptureDetails`) from
+* **Unified Metadata:** Gathers core properties (`FileMetadata`) and photographic details (`CaptureDetails`) from
   media files.
-* **🕰️ Time Resolution:** Analyzes multiple tags to determine the most accurate UTC timestamp and
+* **Time Resolution:** Analyzes multiple exif tags to determine the most accurate UTC timestamp and
   timezone (`TimeInfo`).
-* **🌍 Geolocation & Weather:** Performs reverse geocoding on GPS coordinates (`GpsInfo`) and fetches historical
+* **Geolocation & Weather:** Performs reverse geocoding on GPS coordinates (`GpsInfo`) and fetches historical
   weather and sun data (`WeatherInfo`) from the time of capture.
-* **🏷️ Rich Media Tagging:** Identifies special characteristics like `is_motion_photo`, `is_hdr`, `is_burst`, and
+* **Rich Media Tagging:** Identifies special characteristics like `is_motion_photo`, `is_hdr`, `is_burst`, and
   `is_slowmotion` (`TagData`).
-* **🖼️ Thumbnail Generation:** Creates a tiny, Base64-encoded JPEG data URL, perfect for UI placeholders.
-* **✅ Robust & Asynchronous:** Built with `tokio` for non-blocking I/O and provides clear error handling via the [
-  `MediaAnalyzerError` enum.
 
 ## The `AnalyzeResult` Struct
 
@@ -65,7 +62,7 @@ use media_analyzer::{MediaAnalyzer, MediaAnalyzerError};
 #[tokio::main]
 async fn main() -> Result<(), MediaAnalyzerError> {
     // 1. Build the analyzer. The builder allows for custom configuration.
-    let mut analyzer = MediaAnalyzer::builder()
+    let analyzer = MediaAnalyzer::builder()
         .weather_search_radius_km(75.0) // Optional: configure the analyzer
         .build()
         .await?;

@@ -285,7 +285,7 @@ mod tests {
     async fn test_difficult_tz_offset() -> Result<(), MediaAnalyzerError> {
         // Arrange
         let image = Path::new("assets/tz-offset-bug/IMG_20170904_101507.jpg");
-        let mut et = ExifTool::new()?;
+        let et = ExifTool::new()?;
         let exif = et.json(image, &["-g2"])?;
         let geocoder = ReverseGeocoder::new();
         let numeric_exif = et.json(image, &["-n"])?;
@@ -305,8 +305,8 @@ mod tests {
         let exif = get_full_exif();
         // GPS Coordinates for Groningen, NL
         let gps = MockGpsInfo {
-            latitude: 53.212688,
-            longitude: 6.563036,
+            latitude: 53.212_688,
+            longitude: 6.563_036,
         };
 
         let info = get_time_info(&exif, Some(&gps.into())).unwrap();
@@ -321,7 +321,7 @@ mod tests {
             info.datetime_local,
             NaiveDate::from_ymd_opt(2017, 11, 6)
                 .unwrap()
-                .and_hms_micro_opt(11, 3, 20, 123953)
+                .and_hms_micro_opt(11, 3, 20, 123_953)
                 .unwrap()
         );
         // Timezone should be identified from GPS and used for confirmation.

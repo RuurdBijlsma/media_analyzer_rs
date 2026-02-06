@@ -15,7 +15,7 @@ fn bench(c: &mut Criterion) {
         });
     });
 
-    let mut media_analyzer = rt.block_on(async { MediaAnalyzer::builder().build().await.unwrap() });
+    let media_analyzer = rt.block_on(async { MediaAnalyzer::builder().build().await.unwrap() });
     let image_path = Path::new("./assets/tent.jpg");
 
     c.bench_function("media_analyzer.analyze_media", |b| {
