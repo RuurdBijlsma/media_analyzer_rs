@@ -1,91 +1,5 @@
 {
-  "metadata": {
-    "width": 4032,
-    "height": 2268,
-    "mimeType": "image/jpeg",
-    "duration": null,
-    "sizeBytes": 2814103
-  },
-  "captureDetails": {
-    "iso": 21,
-    "exposureTime": 0.001341,
-    "aperture": 1.68,
-    "focalLength": 24.0,
-    "cameraMake": "Google",
-    "cameraModel": "Pixel 8 Pro"
-  },
-  "tags": {
-    "isMotionPhoto": false,
-    "motionPhotoPresentationTimestamp": null,
-    "isNightSight": false,
-    "isHdr": true,
-    "isBurst": false,
-    "burstId": null,
-    "isTimelapse": false,
-    "isSlowmotion": false,
-    "isVideo": false,
-    "captureFps": null,
-    "videoFps": null
-  },
-  "timeInfo": {
-    "datetimeUtc": "2025-01-10T13:15:51Z",
-    "datetimeNaive": "2025-01-10T14:15:53.512",
-    "timezone": {
-      "name": "Europe/Rome",
-      "offsetSeconds": 3600,
-      "source": "GPSDateTime confirmed by DateTimeOriginal + SubSecTimeOriginal @ GPS location"
-    },
-    "sourceDetails": {
-      "timeSource": "DateTimeOriginal + SubSecTimeOriginal",
-      "confidence": "High"
-    }
-  },
-  "panoInfo": {
-    "usePanoramaViewer": false,
-    "isPhotosphere": false,
-    "viewInfo": null,
-    "projectionType": null
-  },
-  "dataUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAgAAAQABAAD/wAARCAAGAAoDAREAAhEBAxEB/9sAQwAIBgYHBgUIBwcHCQkICgwUDQwLCwwZEhMPFB0aHx4dGhwcICQuJyAiLCMcHCg3KSwwMTQ0NB8nOT04MjwuMzQy/9sAQwEJCQkMCwwYDQ0YMiEcITIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIy/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwA1D4jaqdWkihAit4bgKIxj5sdicZwac5z5tGEVG2qOq/4TNe9kAe+GzXTzmNj/2Q==",
-  "gpsInfo": {
-    "latitude": 38.0290805555556,
-    "longitude": 14.0400277777778,
-    "altitude": 135.9,
-    "location": {
-      "latitude": 38.03856,
-      "longitude": 14.02285,
-      "name": "Cefalu",
-      "admin1": "Sicily",
-      "admin2": "Palermo",
-      "countryCode": "IT",
-      "countryName": "Italy"
-    },
-    "imageDirection": 315.0,
-    "imageDirectionRef": "MagneticNorth"
-  },
-  "weatherInfo": {
-    "hourly": {
-      "datetime": "2025-01-10T13:00:00Z",
-      "temperature": 12.5,
-      "dew_point": 4.7,
-      "relative_humidity": 59,
-      "precipitation": 0.0,
-      "snow": null,
-      "wind_direction": 290,
-      "wind_speed": 14.8,
-      "peak_wind_gust": null,
-      "pressure": 1017.9,
-      "sunshine_minutes": null,
-      "condition": "Fair"
-    },
-    "sunInfo": {
-      "sunrise": "2025-01-10T06:19:48Z",
-      "sunset": "2025-01-10T16:02:31Z",
-      "dawn": "2025-01-10T05:50:45Z",
-      "dusk": "2025-01-10T16:31:34Z",
-      "isDaytime": true
-    }
-  },
+  "hash": "ba90d8cc806716d079906050c404ea41789b8060e5884ccb178e73c3e8aee092",
   "exif": {
     "Camera": {
       "CircleOfConfusion": "0.009 mm",
@@ -93,14 +7,19 @@
       "DigitalZoomRatio": 0,
       "ExposureMode": "Auto",
       "ExposureProgram": "Program AE",
+      "ExposureTimeMax": 32,
+      "ExposureTimeMin": 0.0000263449996709824,
       "Flash": "Off, Did not fire",
       "FocalLength": "6.9 mm",
       "FocalLength35efl": "6.9 mm (35 mm equivalent: 24.0 mm)",
       "FocalLengthIn35mmFormat": "24 mm",
-      "HdrPlusMakernote": "(Binary data 63571 bytes, use -b option to extract)",
+      "HDRPlusMakerNote": "(Binary data 84764 bytes, use -b option to extract)",
       "HyperfocalDistance": "3.28 m",
+      "ISOMax": 21333.33203125,
+      "ISOMin": 20.8333320617676,
       "LensID": "Pixel 8 Pro back camera 6.9mm f/1.68",
       "Make": "Google",
+      "MaxAnalogISO": 1333.33325195312,
       "MaxApertureValue": 1.7,
       "MeteringMode": "Center-weighted average",
       "Model": "Pixel 8 Pro",
@@ -113,11 +32,21 @@
       "SubjectDistanceRange": "Distant",
       "WhiteBalance": "Auto"
     },
+    "Device": {
+      "AndroidRelease": "google/husky/husky:15/AP4A.241205.013/12621605:user/release-keys",
+      "AppVersion": "9.7.047.702121536.18",
+      "Application": "com.google.android.GoogleCamera",
+      "DeviceCodename": "husky",
+      "DeviceHardwareRevision": "MP1.0",
+      "DeviceMake": "Google",
+      "DeviceModel": "Pixel 8 Pro",
+      "HDRPSoftware": "HDR+ 1.0.702121622"
+    },
     "Document": {
       "XMPToolkit": "Adobe XMP Core 5.1.0-jc003"
     },
     "ExifTool": {
-      "ExifToolVersion": 13.21
+      "ExifToolVersion": 13.45
     },
     "Image": {
       "Aperture": 1.7,
@@ -161,10 +90,13 @@
       "FNumber": 1.7,
       "FOV": "73.7 deg",
       "FlashpixVersion": "0100",
+      "FrameCount": 10,
       "GreenMatrixColumn": "0.29198 0.69225 0.04189",
       "GreenTRC": "(Binary data 32 bytes, use -b option to extract)",
       "ISO": 21,
+      "ImageData": "(Binary data 6932 bytes, use -b option to extract)",
       "ImageHeight": 2268,
+      "ImageName": "Finished image",
       "ImageSize": "4032x2268",
       "ImageWidth": 4032,
       "LensMake": "Google",
@@ -199,8 +131,10 @@
       "ShutterSpeed": "1/746",
       "ShutterSpeedValue": "1/744",
       "Software": "HDR+ 1.0.702121622zd",
+      "SummaryText": "(Binary data 17394 bytes, use -b option to extract)",
       "ThumbnailLength": 20374,
       "ThumbnailOffset": 1272,
+      "TimeLogText": "(Binary data 5544 bytes, use -b option to extract)",
       "Version": 1.0,
       "XResolution": 72,
       "YCbCrPositioning": "Centered",
@@ -238,9 +172,9 @@
     "Time": {
       "CreateDate": "2025:01:10 14:15:53",
       "DateTimeOriginal": "2025:01:10 14:15:53",
-      "FileAccessDate": "2025:10:01 17:44:00+02:00",
-      "FileCreateDate": "2025:10:01 14:22:28+02:00",
-      "FileModifyDate": "2025:01:10 14:15:55+01:00",
+      "FileAccessDate": "2026:02:06 21:03:11+01:00",
+      "FileCreateDate": "2026:02:06 21:03:11+01:00",
+      "FileModifyDate": "2026:02:06 21:03:11+01:00",
       "GPSDateStamp": "2025:01:10",
       "GPSDateTime": "2025:01:10 13:15:51Z",
       "GPSTimeStamp": "13:15:51",
@@ -249,12 +183,100 @@
       "OffsetTimeDigitized": "+01:00",
       "OffsetTimeOriginal": "+01:00",
       "ProfileDateTime": "2023:03:09 10:57:00",
+      "SoftwareDate": "2024:11:07 18:20:24.000+01:00",
       "SubSecCreateDate": "2025:01:10 14:15:53.512+01:00",
       "SubSecDateTimeOriginal": "2025:01:10 14:15:53.512+01:00",
       "SubSecModifyDate": "2025:01:10 14:15:53.512+01:00",
       "SubSecTime": 512,
       "SubSecTimeDigitized": 512,
       "SubSecTimeOriginal": 512
+    }
+  },
+  "metadata": {
+    "width": 4032,
+    "height": 2268,
+    "mimeType": "image/jpeg",
+    "duration": null,
+    "sizeBytes": 2814103,
+    "orientation": 1
+  },
+  "captureDetails": {
+    "iso": 21,
+    "exposureTime": 0.001341,
+    "aperture": 1.68,
+    "focalLength": 24.0,
+    "cameraMake": "Google",
+    "cameraModel": "Pixel 8 Pro"
+  },
+  "tags": {
+    "isMotionPhoto": false,
+    "motionPhotoPresentationTimestamp": null,
+    "isNightSight": false,
+    "isHdr": true,
+    "isBurst": false,
+    "burstId": null,
+    "isTimelapse": false,
+    "isSlowmotion": false,
+    "isVideo": false,
+    "captureFps": null,
+    "videoFps": null
+  },
+  "timeInfo": {
+    "datetimeUtc": "2025-01-10T13:15:51Z",
+    "datetimeLocal": "2025-01-10T14:15:53.512",
+    "timezone": {
+      "name": "Europe/Rome",
+      "offsetSeconds": 3600,
+      "source": "GPSDateTime confirmed by DateTimeOriginal + SubSecTimeOriginal @ GPS location"
+    },
+    "sourceDetails": {
+      "timeSource": "DateTimeOriginal + SubSecTimeOriginal",
+      "confidence": "High"
+    }
+  },
+  "panoInfo": {
+    "usePanoramaViewer": false,
+    "isPhotosphere": false,
+    "viewInfo": null,
+    "projectionType": null
+  },
+  "gpsInfo": {
+    "latitude": 38.0290805555556,
+    "longitude": 14.0400277777778,
+    "altitude": 135.9,
+    "location": {
+      "latitude": 38.03856,
+      "longitude": 14.02285,
+      "name": "Cefalu",
+      "admin1": "Sicily",
+      "admin2": "Palermo",
+      "countryCode": "IT",
+      "countryName": "Italy"
+    },
+    "imageDirection": 315.0,
+    "imageDirectionRef": "MagneticNorth"
+  },
+  "weatherInfo": {
+    "hourly": {
+      "datetime": "2025-01-10T13:00:00Z",
+      "temperature": 12.5,
+      "dew_point": 4.7,
+      "relative_humidity": 59,
+      "precipitation": 0.0,
+      "snow": null,
+      "wind_direction": 290,
+      "wind_speed": 14.8,
+      "peak_wind_gust": null,
+      "pressure": 1017.9,
+      "sunshine_minutes": null,
+      "condition": "Fair"
+    },
+    "sunInfo": {
+      "sunrise": "2025-01-10T06:19:48Z",
+      "sunset": "2025-01-10T16:02:31Z",
+      "dawn": "2025-01-10T05:50:45Z",
+      "dusk": "2025-01-10T16:31:34Z",
+      "isDaytime": true
     }
   }
 }
