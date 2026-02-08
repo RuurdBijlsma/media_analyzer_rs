@@ -125,42 +125,25 @@ impl MediaAnalyzer {
     /// # }
     /// ```
     pub fn analyze_media(&self, media_file: &Path) -> Result<AnalyzeResult, MediaAnalyzerError> {
-        let (hash, exif_info, numeric_exif) = tokio::task::block_in_place(|| {
-            let mut hash: Result<String, MediaAnalyzerError> = Ok(String::new());
-            let mut exif_info: Result<serde_json::Value, MediaAnalyzerError> =
-                Ok(serde_json::Value::Null);
-            let mut numeric_exif: Result<serde_json::Value, MediaAnalyzerError> =
-                Ok(serde_json::Value::Null);
-
+        let (hash, (exif_info, numeric_exif)) = tokio::task::block_in_place(|| {
             rayon::join(
-                || hash = hash_file(media_file).map_err(Into::into),
+                || hash_file(media_file),
                 || {
                     rayon::join(
-                        || {
-                            exif_info = self
-                                .exiftool1
-                                .json(media_file, &["-g2"])
-                                .map_err(Into::into);
-                        },
-                        || {
-                            numeric_exif =
-                                self.exiftool2.json(media_file, &["-n"]).map_err(Into::into);
-                        },
+                        || self.exiftool1.json(media_file, &["-g2"]),
+                        || self.exiftool2.json(media_file, &["-n"]),
                     )
                 },
-            );
-
-            match (hash, exif_info, numeric_exif) {
-                (Ok(h), Ok(e), Ok(n)) => Ok((h, e, n)),
-                (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => Err(e),
-            }
-        })?;
+            )
+        });
+        let hash = hash?;
+        let exif_info = exif_info?;
+        let numeric_exif = numeric_exif?;
 
         let (metadata, capture_details) = get_metadata(&numeric_exif)?;
         let tags = extract_tags(media_file, &numeric_exif);
         let gps_info = get_gps_info(&self.geocoder, &numeric_exif);
         let pano_info = get_pano_info(media_file, &numeric_exif);
-
         let time_info = get_time_info(&exif_info, gps_info.as_ref())?;
 
         Ok(AnalyzeResult {
