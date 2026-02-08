@@ -9,7 +9,7 @@
 //!
 //! This crate provides a high-level, asynchronous API to analyze media files. It acts as a
 //! facade over tools like `exiftool`, combining raw metadata with parsing,
-//! geolocation, and historical weather data to produce a single, easy-to-use result.
+//! geolocation data to produce a single, easy-to-use result.
 //!
 //! The core philosophy is to be a "best-effort" analyzer. It robustly processes what it can,
 //! and provides detailed information in a structured format.
@@ -29,11 +29,6 @@
 //! - **Time Resolution**: It analyzes multiple EXIF
 //!   tags, file metadata, and GPS data to determine the most accurate UTC timestamp and timezone
 //!   information, summarized in the [`TimeInfo`] struct.
-//!
-//! - **Geolocation & Weather**: Automatically performs reverse geocoding on GPS coordinates to find
-//!   human-readable location names ([`GpsInfo`]). If successful, it then fetches historical weather
-//!   and sun data (sunrise, sunset) for the precise time and place the media was captured,
-//!   populating the [`WeatherInfo`] struct.
 //!
 //! - **Rich Media Tagging**: Identifies a wide variety of special media characteristics, such as
 //!   `is_motion_photo`, `is_hdr`, `is_burst`, `is_slowmotion`, and `is_timelapse`, all available
@@ -61,9 +56,7 @@
 //! async fn main() -> Result<(), MediaAnalyzerError> {
 //!     // 1. Build the analyzer. The builder allows for custom configuration.
 //!     let analyzer = MediaAnalyzer::builder()
-//!         .weather_search_radius_km(50.0) // Optional: configure the analyzer
-//!         .build()
-//!         .await?;
+//!         .build()?;
 //!
 //!     // 2. Define the path to the media file to analyze.
 //!     let media_file = Path::new("assets/sunset.jpg");
@@ -106,7 +99,6 @@ pub use error::MediaAnalyzerError;
 pub use features::gps::{GpsInfo, LocationName};
 pub use features::metadata::{CaptureDetails, FileMetadata};
 pub use features::pano::{PanoInfo, PanoViewInfo};
-pub use features::weather::{SunInfo, WeatherInfo};
 pub use structs::AnalyzeResult;
 pub use tags::structs::TagData;
 pub use time::structs::{SourceDetails, TimeInfo, TimeZoneInfo};

@@ -1,6 +1,6 @@
 use crate::tags::structs::TagData;
 use crate::time::structs::TimeInfo;
-use crate::{CaptureDetails, FileMetadata, GpsInfo, PanoInfo, WeatherInfo};
+use crate::{CaptureDetails, FileMetadata, GpsInfo, PanoInfo};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -15,5 +15,4 @@ pub struct AnalyzeResult {
     pub time_info: TimeInfo,
     pub pano_info: PanoInfo,
     pub gps_info: Option<GpsInfo>,
-    pub weather_info: Option<WeatherInfo>,
 }
