@@ -192,7 +192,7 @@
       "SubSecTimeOriginal": 512
     }
   },
-  "metadata": {
+  "basic": {
     "width": 4032,
     "height": 2268,
     "mimeType": "image/jpeg",
@@ -200,7 +200,7 @@
     "sizeBytes": 2814103,
     "orientation": 1
   },
-  "captureDetails": {
+  "camera": {
     "iso": 21,
     "exposureTime": 0.001341,
     "aperture": 1.68,
@@ -208,7 +208,7 @@
     "cameraMake": "Google",
     "cameraModel": "Pixel 8 Pro"
   },
-  "tags": {
+  "features": {
     "isMotionPhoto": false,
     "motionPhotoPresentationTimestamp": null,
     "isNightSight": false,
@@ -221,7 +221,7 @@
     "captureFps": null,
     "videoFps": null
   },
-  "timeInfo": {
+  "time": {
     "datetimeUtc": "2025-01-10T13:15:51Z",
     "datetimeLocal": "2025-01-10T14:15:53.512",
     "timezone": {
@@ -234,13 +234,13 @@
       "confidence": "High"
     }
   },
-  "panoInfo": {
+  "panorama": {
     "usePanoramaViewer": false,
     "isPhotosphere": false,
     "viewInfo": null,
     "projectionType": null
   },
-  "gpsInfo": {
+  "gps": {
     "latitude": 38.0290805555556,
     "longitude": 14.0400277777778,
     "altitude": 135.9,
@@ -255,28 +255,5 @@
     },
     "imageDirection": 315.0,
     "imageDirectionRef": "MagneticNorth"
-  },
-  "weatherInfo": {
-    "hourly": {
-      "datetime": "2025-01-10T13:00:00Z",
-      "temperature": 12.5,
-      "dew_point": 4.7,
-      "relative_humidity": 59,
-      "precipitation": 0.0,
-      "snow": null,
-      "wind_direction": 290,
-      "wind_speed": 14.8,
-      "peak_wind_gust": null,
-      "pressure": 1017.9,
-      "sunshine_minutes": null,
-      "condition": "Fair"
-    },
-    "sunInfo": {
-      "sunrise": "2025-01-10T06:19:48Z",
-      "sunset": "2025-01-10T16:02:31Z",
-      "dawn": "2025-01-10T05:50:45Z",
-      "dusk": "2025-01-10T16:31:34Z",
-      "isDaytime": true
-    }
   }
 }
