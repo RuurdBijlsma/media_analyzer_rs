@@ -17,6 +17,12 @@ pub enum MediaAnalyzerError {
     #[error("Data URL generation failed: {0}")]
     DataUrl(#[from] crate::features::error::DataUrlError),
 
+    #[error("Weather data retrieval failed: {0}")]
+    Weather(#[from] crate::features::error::WeatherError),
+
+    #[error("Weather service (Meteostat) initialization failed")]
+    Meteostat(#[from] meteostat::MeteostatError),
+
     #[error("No thumbnail frames were provided to generate a data URL")]
     NoThumbnail,
 }

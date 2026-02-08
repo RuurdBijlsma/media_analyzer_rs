@@ -15,3 +15,15 @@ pub enum DataUrlError {
     #[error("I/O error during thumbnail generation")]
     Io(#[from] std::io::Error),
 }
+
+#[derive(Error, Debug)]
+pub enum WeatherError {
+    #[error("Weather API call failed")]
+    ApiError(#[from] meteostat::MeteostatError),
+
+    #[error("No weather data available for the specified time and location")]
+    NoDataAvailable,
+
+    #[error("Failed to calculate sun position")]
+    SunCalculationError,
+}
