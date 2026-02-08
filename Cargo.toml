@@ -1,6 +1,6 @@
 [package]
 name = "media_analyzer"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2024"
 license = "Apache-2.0"
 description = "Extract file-based information from photo and video files."
@@ -23,7 +23,7 @@ exiftool = "0.3.1"
 rayon = "1.10.0"
 regex = "1.12.2"
 serde_json = "1.0.140"
-tokio = {version = "1.49.0", features = ["full"]}
+tokio = { version = "1.49.0", features = ["rt-multi-thread", "rt", "macros"] }
 serde = { version = "1.0.228", default-features = false }
 chrono = { version = "0.4.41", default-features = false, features = ["alloc", "serde"] }
 chrono-tz = { version = "0.10.3", default-features = false, features = ["serde"] }
