@@ -39,7 +39,7 @@ pub fn list_files_walkdir_filtered(
 /// Sample random photo(s) from a folder to test the media analyzer for various files.
 #[tokio::main]
 async fn main() -> Result<(), MediaAnalyzerError> {
-    let analyzer = MediaAnalyzer::builder().build().await?;
+    let analyzer = MediaAnalyzer::builder().build()?;
 
     let start_dir = Path::new("E:/Backup/Photos/photos/photos");
     let all_files = list_files_walkdir_filtered(start_dir, false).unwrap();
@@ -52,7 +52,7 @@ async fn main() -> Result<(), MediaAnalyzerError> {
         let path = &file.canonicalize()?;
         opener::open(path).expect("can't open photo");
         println!("\t{}", path.display());
-        let analyze_result = analyzer.analyze_media(path).await?;
+        let analyze_result = analyzer.analyze_media(path)?;
         println!("{}", serde_json::to_string_pretty(&analyze_result).unwrap());
     }
 

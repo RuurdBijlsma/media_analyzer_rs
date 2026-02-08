@@ -4,7 +4,7 @@ use serde_json::Value;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct FileMetadata {
+pub struct BasicMetadata {
     pub width: u64,
     pub height: u64,
     pub mime_type: String,
@@ -15,7 +15,7 @@ pub struct FileMetadata {
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct CaptureDetails {
+pub struct CameraSettings {
     pub iso: Option<u64>,
     pub exposure_time: Option<f64>,
     pub aperture: Option<f64>,
@@ -60,7 +60,7 @@ fn parse_duration(val: &Value) -> Option<f64> {
     })
 }
 
-pub fn get_metadata(exif: &Value) -> Result<(FileMetadata, CaptureDetails), MetadataError> {
+pub fn get_metadata(exif: &Value) -> Result<(BasicMetadata, CameraSettings), MetadataError> {
     let mut width = get_required_u64(exif, "ImageWidth")?;
     let mut height = get_required_u64(exif, "ImageHeight")?;
     let orientation = get_u64(exif, "Orientation");
@@ -72,7 +72,7 @@ pub fn get_metadata(exif: &Value) -> Result<(FileMetadata, CaptureDetails), Meta
         std::mem::swap(&mut width, &mut height);
     }
     Ok((
-        FileMetadata {
+        BasicMetadata {
             width,
             height,
             mime_type: get_required_string(exif, "MIMEType")?,
@@ -80,7 +80,7 @@ pub fn get_metadata(exif: &Value) -> Result<(FileMetadata, CaptureDetails), Meta
             orientation,
             duration: exif.get("Duration").and_then(parse_duration),
         },
-        CaptureDetails {
+        CameraSettings {
             iso: get_u64(exif, "ISO"),
             exposure_time: get_f64(exif, "ExposureTime"),
             aperture: get_f64(exif, "Aperture"),
