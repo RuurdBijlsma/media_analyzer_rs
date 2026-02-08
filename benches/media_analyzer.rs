@@ -21,10 +21,7 @@ fn bench(c: &mut Criterion) {
     c.bench_function("media_analyzer.analyze_media", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let _ = media_analyzer
-                    .analyze_media(black_box(image_path))
-                    .await
-                    .unwrap();
+                let _ = media_analyzer.analyze_media(black_box(image_path)).unwrap();
             });
         });
     });

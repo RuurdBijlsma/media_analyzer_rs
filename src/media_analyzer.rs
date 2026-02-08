@@ -117,24 +117,48 @@ impl MediaAnalyzer {
     /// let photo_path = Path::new("assets/tent.jpg");
     ///
     /// // Analyze a photo, using the photo itself as the thumbnail source.
-    /// let result = analyzer.analyze_media(photo_path).await?;
+    /// let result = analyzer.analyze_media(photo_path)?;
     ///
     /// println!("Photo taken in {:?}", result.gps_info.unwrap().location);
     /// println!("Camera Model: {}", result.capture_details.camera_model.unwrap_or_default());
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn analyze_media(
-        &self,
-        media_file: &Path,
-    ) -> Result<AnalyzeResult, MediaAnalyzerError> {
-        let hash = hash_file(media_file)?;
-        let exif_info = self.exiftool1.json(media_file, &["-g2"])?;
-        let numeric_exif = self.exiftool2.json(media_file, &["-n"])?;
+    pub fn analyze_media(&self, media_file: &Path) -> Result<AnalyzeResult, MediaAnalyzerError> {
+        let (hash, exif_info, numeric_exif) = tokio::task::block_in_place(|| {
+            let mut hash: Result<String, MediaAnalyzerError> = Ok(String::new());
+            let mut exif_info: Result<serde_json::Value, MediaAnalyzerError> =
+                Ok(serde_json::Value::Null);
+            let mut numeric_exif: Result<serde_json::Value, MediaAnalyzerError> =
+                Ok(serde_json::Value::Null);
+
+            rayon::join(
+                || hash = hash_file(media_file).map_err(Into::into),
+                || {
+                    rayon::join(
+                        || {
+                            exif_info = self
+                                .exiftool1
+                                .json(media_file, &["-g2"])
+                                .map_err(Into::into);
+                        },
+                        || {
+                            numeric_exif =
+                                self.exiftool2.json(media_file, &["-n"]).map_err(Into::into);
+                        },
+                    )
+                },
+            );
+
+            match (hash, exif_info, numeric_exif) {
+                (Ok(h), Ok(e), Ok(n)) => Ok((h, e, n)),
+                (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => Err(e),
+            }
+        })?;
 
         let (metadata, capture_details) = get_metadata(&numeric_exif)?;
         let tags = extract_tags(media_file, &numeric_exif);
-        let gps_info = get_gps_info(&self.geocoder, &numeric_exif).await;
+        let gps_info = get_gps_info(&self.geocoder, &numeric_exif);
         let pano_info = get_pano_info(media_file, &numeric_exif);
 
         let time_info = get_time_info(&exif_info, gps_info.as_ref())?;
@@ -165,13 +189,13 @@ mod tests {
             .join(relative)
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_full_analysis_on_standard_jpg() -> Result<(), MediaAnalyzerError> {
         let analyzer = MediaAnalyzer::builder().build()?;
         let media_file = asset_path("sunset.jpg");
 
         // For a photo, the thumbnail is the file itself.
-        let result = analyzer.analyze_media(&media_file).await?;
+        let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
         assert_eq!(result.metadata.width, 5312);
@@ -184,13 +208,13 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_on_hdr() -> Result<(), MediaAnalyzerError> {
         let analyzer = MediaAnalyzer::builder().build()?;
         let media_file = asset_path("hdr.jpg");
 
         // For a photo, the thumbnail is the file itself.
-        let result = analyzer.analyze_media(&media_file).await?;
+        let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
         assert_eq!(result.metadata.width, 4032);
@@ -203,13 +227,13 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_on_heic() -> Result<(), MediaAnalyzerError> {
         let analyzer = MediaAnalyzer::builder().build()?;
         let media_file = asset_path("iphone.HEIC");
 
         // For a photo, the thumbnail is the file itself.
-        let result = analyzer.analyze_media(&media_file).await?;
+        let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
         assert_eq!(result.metadata.width, 3024);
@@ -223,12 +247,12 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_full_analysis_on_standard_video() -> Result<(), MediaAnalyzerError> {
         let analyzer = MediaAnalyzer::builder().build()?;
         let media_file = asset_path("video/car.webm");
 
-        let result = analyzer.analyze_media(&media_file).await?;
+        let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
         assert!(result.tags.is_video);
@@ -242,12 +266,12 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_motion_photo_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
         let analyzer = MediaAnalyzer::builder().build()?;
         let media_file = asset_path("motion/PXL_20250103_180944831.MP.jpg");
 
-        let result = analyzer.analyze_media(&media_file).await?;
+        let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
         assert!(
@@ -260,12 +284,12 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_photosphere_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
         let analyzer = MediaAnalyzer::builder().build()?;
         let media_file = asset_path("photosphere.jpg");
 
-        let result = analyzer.analyze_media(&media_file).await?;
+        let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
         assert!(result.pano_info.is_photosphere);
@@ -278,12 +302,12 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_night_sight_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
         let analyzer = MediaAnalyzer::builder().build()?;
         let media_file = asset_path("night_sight/PXL_20250104_170020532.NIGHT.jpg");
 
-        let result = analyzer.analyze_media(&media_file).await?;
+        let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
         assert!(result.tags.is_night_sight);
@@ -291,13 +315,13 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_slow_motion_video_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
         let analyzer = MediaAnalyzer::builder().build()?;
         let media_file = asset_path("slowmotion.mp4");
         // For video tests, we can just use any jpg as a placeholder thumbnail
 
-        let result = analyzer.analyze_media(&media_file).await?;
+        let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
         assert!(result.tags.is_video);
@@ -307,12 +331,12 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_timelapse_video_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
         let analyzer = MediaAnalyzer::builder().build()?;
         let media_file = asset_path("timelapse.mp4");
 
-        let result = analyzer.analyze_media(&media_file).await?;
+        let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
         assert!(result.tags.is_video);
@@ -322,12 +346,12 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_analysis_fails_gracefully_for_non_media_file() -> Result<(), MediaAnalyzerError> {
         let analyzer = MediaAnalyzer::builder().build()?;
         let media_file = asset_path("text_file.txt");
 
-        let result = analyzer.analyze_media(&media_file).await;
+        let result = analyzer.analyze_media(&media_file);
 
         // --- Assertions ---
         assert!(result.is_err(), "Analysis should fail for a non-media file");
@@ -342,12 +366,12 @@ mod tests {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_detailed_gps_time() -> Result<(), MediaAnalyzerError> {
         let analyzer = MediaAnalyzer::builder().build()?;
         let media_file = asset_path("sunset.jpg");
 
-        let result = analyzer.analyze_media(&media_file).await?;
+        let result = analyzer.analyze_media(&media_file)?;
 
         // --- 1. GPS Info Assertions ---
         let gps_info = result

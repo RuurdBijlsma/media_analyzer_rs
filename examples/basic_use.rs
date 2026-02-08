@@ -5,7 +5,7 @@ use std::path::Path;
 async fn main() -> Result<(), MediaAnalyzerError> {
     let path = Path::new("assets/hdr.jpg");
     let analyzer = MediaAnalyzer::builder().build()?;
-    let analyze_result = analyzer.analyze_media(path).await?;
+    let analyze_result = analyzer.analyze_media(path)?;
     println!("{}", serde_json::to_string_pretty(&analyze_result).unwrap());
 
     Ok(())

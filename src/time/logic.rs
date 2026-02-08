@@ -281,7 +281,7 @@ mod tests {
         .unwrap()
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_difficult_tz_offset() -> Result<(), MediaAnalyzerError> {
         // Arrange
         let image = Path::new("assets/tz-offset-bug/IMG_20170904_101507.jpg");
@@ -289,7 +289,7 @@ mod tests {
         let exif = et.json(image, &["-g2"])?;
         let geocoder = ReverseGeocoder::new();
         let numeric_exif = et.json(image, &["-n"])?;
-        let gps_info = get_gps_info(&geocoder, &numeric_exif).await;
+        let gps_info = get_gps_info(&geocoder, &numeric_exif);
 
         // Act
         let time_info = get_time_info(&exif, gps_info.as_ref())?;

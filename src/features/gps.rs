@@ -31,7 +31,7 @@ pub struct LocationName {
     pub country_name: Option<String>,
 }
 
-pub async fn get_gps_info(geocoder: &ReverseGeocoder, numeric_exif: &Value) -> Option<GpsInfo> {
+pub fn get_gps_info(geocoder: &ReverseGeocoder, numeric_exif: &Value) -> Option<GpsInfo> {
     let (Some(latitude), Some(longitude)) = (
         numeric_exif.get("GPSLatitude").and_then(Value::as_f64),
         numeric_exif.get("GPSLongitude").and_then(Value::as_f64),
@@ -90,7 +90,7 @@ mod tests {
             "GPSImgDirectionRef": "T"
         });
 
-        let result = get_gps_info(&geocoder, &numeric_exif).await;
+        let result = get_gps_info(&geocoder, &numeric_exif);
 
         // 1. Assert that we got a result
         assert!(result.is_some(), "Should return Some for valid GPS data");
@@ -120,7 +120,7 @@ mod tests {
             "GPSLongitude": -74.0060
         });
 
-        let result = get_gps_info(&geocoder, &numeric_exif).await;
+        let result = get_gps_info(&geocoder, &numeric_exif);
 
         // 1. Assert that we still get a result
         assert!(result.is_some(), "Should return Some for minimal GPS data");
@@ -148,7 +148,7 @@ mod tests {
             "GPSLongitude": 4.899_431,
         });
 
-        let result = get_gps_info(&geocoder, &numeric_exif).await;
+        let result = get_gps_info(&geocoder, &numeric_exif);
         assert!(
             result.is_none(),
             "Should return None when GPSLatitude is missing"
@@ -163,7 +163,7 @@ mod tests {
             "GPSLatitude": 52.379_189,
         });
 
-        let result = get_gps_info(&geocoder, &numeric_exif).await;
+        let result = get_gps_info(&geocoder, &numeric_exif);
         assert!(
             result.is_none(),
             "Should return None when GPSLongitude is missing"
@@ -175,7 +175,7 @@ mod tests {
         let geocoder = ReverseGeocoder::new();
         let numeric_exif = json!({}); // Empty JSON object
 
-        let result = get_gps_info(&geocoder, &numeric_exif).await;
+        let result = get_gps_info(&geocoder, &numeric_exif);
         assert!(result.is_none(), "Should return None for empty EXIF data");
     }
 }
