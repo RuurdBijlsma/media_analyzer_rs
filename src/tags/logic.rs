@@ -6,7 +6,7 @@ use serde_json::Value;
 use std::path::Path;
 
 /// Extracts tags from a file's path and its EXIF metadata.
-pub fn extract_tags(path: &Path, exif: &Value) -> MediaFeatures {
+pub fn extract_features(path: &Path, exif: &Value) -> MediaFeatures {
     let filename_lower = path
         .file_name()
         .unwrap_or_default()
@@ -109,7 +109,7 @@ mod tests {
         let et = ExifTool::new()?;
         let exif_data = et.json(&path, &["-n"])?;
 
-        Ok(extract_tags(&path, &exif_data))
+        Ok(extract_features(&path, &exif_data))
     }
 
     #[test]

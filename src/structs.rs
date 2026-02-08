@@ -1,6 +1,6 @@
 use crate::tags::structs::MediaFeatures;
 use crate::time::structs::TimeInfo;
-use crate::{BasicMetadata, CameraSettings, GpsInfo, PanoInfo};
+use crate::{BasicMetadata, CameraSettings, GpsInfo, PanoInfo, WeatherInfo};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -15,4 +15,5 @@ pub struct MediaMetadata {
     pub time: TimeInfo,
     pub panorama: PanoInfo,
     pub gps: Option<GpsInfo>,
+    pub weather: Option<WeatherInfo>,
 }

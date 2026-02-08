@@ -1,6 +1,6 @@
 [package]
 name = "media_analyzer"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2024"
 license = "Apache-2.0"
 description = "Extract file-based information from photo and video files."
@@ -34,6 +34,8 @@ reverse_geocoder = "4.1.1"
 rust_iso3166 = "0.1.14"
 thiserror = { version = "2.0.17", default-features = false }
 blake3 = { version = "1.8.2", features = ["mmap", "rayon"] }
+meteostat = "0.4.6"
+sunrise = "3.0.0"
 
 [dev-dependencies]
 criterion = { version = "0.8.2", default-features = false }

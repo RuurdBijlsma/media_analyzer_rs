@@ -3,3 +3,4 @@ pub mod gps;
 pub mod hashing;
 pub mod metadata;
 pub mod pano;
+pub mod weather;
