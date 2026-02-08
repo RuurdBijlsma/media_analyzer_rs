@@ -3,7 +3,7 @@ use crate::features::gps::get_gps_info;
 use crate::features::hashing::hash_file;
 use crate::features::metadata::get_metadata;
 use crate::features::pano::get_pano_info;
-use crate::structs::AnalyzeResult;
+use crate::structs::MediaMetadata;
 use crate::tags::logic::extract_tags;
 use crate::time::get_time_info;
 use bon::bon;
@@ -80,7 +80,7 @@ impl MediaAnalyzer {
     /// Analyzes a media file and extracts a set of metadata.
     ///
     /// This is the primary analysis function. It orchestrates all the individual parsing
-    /// and data-gathering modules to produce a single, consolidated `AnalyzeResult`.
+    /// and data-gathering modules to produce a single, consolidated `MediaMetadata`.
     ///
     /// # Arguments
     ///
@@ -89,7 +89,7 @@ impl MediaAnalyzer {
     ///
     /// # Returns
     ///
-    /// On success, returns a `Result` containing an [`AnalyzeResult`] struct with the following fields:
+    /// On success, returns a `Result` containing an [`MediaMetadata`] struct with the following fields:
     /// * `exif`: The raw, grouped (`-g2`) JSON output from `exiftool`.
     /// * `metadata`: Core file properties like width, height, and duration.
     /// * `capture_details`: Photographic details like ISO, aperture, and camera model.
@@ -119,12 +119,12 @@ impl MediaAnalyzer {
     /// // Analyze a photo, using the photo itself as the thumbnail source.
     /// let result = analyzer.analyze_media(photo_path)?;
     ///
-    /// println!("Photo taken in {:?}", result.gps_info.unwrap().location);
-    /// println!("Camera Model: {}", result.capture_details.camera_model.unwrap_or_default());
+    /// println!("Photo taken in {:?}", result.gps.unwrap().location);
+    /// println!("Camera Model: {}", result.camera.camera_model.unwrap_or_default());
     /// # Ok(())
     /// # }
     /// ```
-    pub fn analyze_media(&self, media_file: &Path) -> Result<AnalyzeResult, MediaAnalyzerError> {
+    pub fn analyze_media(&self, media_file: &Path) -> Result<MediaMetadata, MediaAnalyzerError> {
         let (hash, (exif_info, numeric_exif)) = tokio::task::block_in_place(|| {
             rayon::join(
                 || hash_file(media_file),
@@ -146,15 +146,15 @@ impl MediaAnalyzer {
         let pano_info = get_pano_info(media_file, &numeric_exif);
         let time_info = get_time_info(&exif_info, gps_info.as_ref())?;
 
-        Ok(AnalyzeResult {
+        Ok(MediaMetadata {
             hash,
             exif: exif_info,
-            tags,
-            time_info,
-            gps_info,
-            pano_info,
-            metadata,
-            capture_details,
+            features: tags,
+            time: time_info,
+            gps: gps_info,
+            panorama: pano_info,
+            basic: metadata,
+            camera: capture_details,
         })
     }
 }
@@ -181,12 +181,12 @@ mod tests {
         let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
-        assert_eq!(result.metadata.width, 5312);
-        assert!(!result.tags.is_video);
-        assert!(!result.tags.is_hdr, "sunset.jpg is not hdr");
-        assert!(result.gps_info.is_some(), "Should have GPS info");
-        assert!(!result.tags.is_burst);
-        assert!(!result.pano_info.is_photosphere);
+        assert_eq!(result.basic.width, 5312);
+        assert!(!result.features.is_video);
+        assert!(!result.features.is_hdr, "sunset.jpg is not hdr");
+        assert!(result.gps.is_some(), "Should have GPS info");
+        assert!(!result.features.is_burst);
+        assert!(!result.panorama.is_photosphere);
 
         Ok(())
     }
@@ -200,12 +200,12 @@ mod tests {
         let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
-        assert_eq!(result.metadata.width, 4032);
-        assert!(!result.tags.is_video);
-        assert!(result.tags.is_hdr, "hdr.jpg is hdr");
-        assert!(result.gps_info.is_some(), "Should have GPS info");
-        assert!(!result.tags.is_burst);
-        assert!(!result.pano_info.is_photosphere);
+        assert_eq!(result.basic.width, 4032);
+        assert!(!result.features.is_video);
+        assert!(result.features.is_hdr, "hdr.jpg is hdr");
+        assert!(result.gps.is_some(), "Should have GPS info");
+        assert!(!result.features.is_burst);
+        assert!(!result.panorama.is_photosphere);
 
         Ok(())
     }
@@ -219,13 +219,13 @@ mod tests {
         let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
-        assert_eq!(result.metadata.width, 3024);
-        assert_eq!(result.metadata.orientation, Some(6));
-        assert!(!result.tags.is_video);
-        assert!(!result.tags.is_hdr);
-        assert!(result.gps_info.is_some(), "Should have GPS info");
-        assert!(!result.tags.is_burst);
-        assert!(!result.pano_info.is_photosphere);
+        assert_eq!(result.basic.width, 3024);
+        assert_eq!(result.basic.orientation, Some(6));
+        assert!(!result.features.is_video);
+        assert!(!result.features.is_hdr);
+        assert!(result.gps.is_some(), "Should have GPS info");
+        assert!(!result.features.is_burst);
+        assert!(!result.panorama.is_photosphere);
 
         Ok(())
     }
@@ -238,13 +238,13 @@ mod tests {
         let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
-        assert!(result.tags.is_video);
-        assert!(result.metadata.duration.is_some());
-        assert!(result.tags.video_fps.is_some());
-        assert!(!result.tags.is_slowmotion);
-        assert!(!result.tags.is_timelapse);
-        assert!(!result.tags.is_motion_photo);
-        assert!(!result.tags.is_hdr);
+        assert!(result.features.is_video);
+        assert!(result.basic.duration.is_some());
+        assert!(result.features.video_fps.is_some());
+        assert!(!result.features.is_slowmotion);
+        assert!(!result.features.is_timelapse);
+        assert!(!result.features.is_motion_photo);
+        assert!(!result.features.is_hdr);
 
         Ok(())
     }
@@ -258,11 +258,16 @@ mod tests {
 
         // --- Assertions ---
         assert!(
-            !result.tags.is_video,
+            !result.features.is_video,
             "Motion Photo is not a primary video file"
         );
-        assert!(result.tags.is_motion_photo);
-        assert!(result.tags.motion_photo_presentation_timestamp.is_some());
+        assert!(result.features.is_motion_photo);
+        assert!(
+            result
+                .features
+                .motion_photo_presentation_timestamp
+                .is_some()
+        );
 
         Ok(())
     }
@@ -275,10 +280,10 @@ mod tests {
         let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
-        assert!(result.pano_info.is_photosphere);
-        assert!(result.pano_info.use_panorama_viewer);
+        assert!(result.panorama.is_photosphere);
+        assert!(result.panorama.use_panorama_viewer);
         assert_eq!(
-            result.pano_info.projection_type,
+            result.panorama.projection_type,
             Some("equirectangular".to_string())
         );
 
@@ -293,7 +298,7 @@ mod tests {
         let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
-        assert!(result.tags.is_night_sight);
+        assert!(result.features.is_night_sight);
 
         Ok(())
     }
@@ -307,9 +312,9 @@ mod tests {
         let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
-        assert!(result.tags.is_video);
-        assert!(result.tags.is_slowmotion);
-        assert!(!result.tags.is_timelapse);
+        assert!(result.features.is_video);
+        assert!(result.features.is_slowmotion);
+        assert!(!result.features.is_timelapse);
 
         Ok(())
     }
@@ -322,9 +327,9 @@ mod tests {
         let result = analyzer.analyze_media(&media_file)?;
 
         // --- Assertions ---
-        assert!(result.tags.is_video);
-        assert!(result.tags.is_timelapse);
-        assert!(!result.tags.is_slowmotion);
+        assert!(result.features.is_video);
+        assert!(result.features.is_timelapse);
+        assert!(!result.features.is_slowmotion);
 
         Ok(())
     }
@@ -358,7 +363,7 @@ mod tests {
 
         // --- 1. GPS Info Assertions ---
         let gps_info = result
-            .gps_info
+            .gps
             .as_ref()
             .expect("GPS info should be extracted for sunset.jpg");
 
@@ -373,7 +378,7 @@ mod tests {
         assert_eq!(gps_info.location.country_name, Some("Italy".to_string()));
 
         // --- 2. Time Info Assertions ---
-        let time_info = result.time_info;
+        let time_info = result.time;
 
         // Check that the highest confidence method was used (Naive time + GPS location)
         assert_eq!(time_info.source_details.confidence, "High");

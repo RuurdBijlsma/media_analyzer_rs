@@ -1,12 +1,12 @@
 use crate::tags::burst::find_burst_info;
 use crate::tags::fps::get_fps;
 use crate::tags::hdr::detect_hdr;
-use crate::tags::structs::TagData;
+use crate::tags::structs::MediaFeatures;
 use serde_json::Value;
 use std::path::Path;
 
 /// Extracts tags from a file's path and its EXIF metadata.
-pub fn extract_tags(path: &Path, exif: &Value) -> TagData {
+pub fn extract_tags(path: &Path, exif: &Value) -> MediaFeatures {
     let filename_lower = path
         .file_name()
         .unwrap_or_default()
@@ -74,7 +74,7 @@ pub fn extract_tags(path: &Path, exif: &Value) -> TagData {
         );
 
     // --- Construct and return the final struct ---
-    TagData {
+    MediaFeatures {
         is_motion_photo,
         motion_photo_presentation_timestamp,
         is_night_sight,
@@ -98,7 +98,7 @@ mod tests {
 
     /// Helper function to reduce boilerplate in tests.
     /// It takes a relative path to an asset, runs exiftool, and returns the extracted tags.
-    fn get_tags_for_asset(relative_path: &str) -> Result<TagData, MediaAnalyzerError> {
+    fn get_tags_for_asset(relative_path: &str) -> Result<MediaFeatures, MediaAnalyzerError> {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("assets")
             .join(relative_path);

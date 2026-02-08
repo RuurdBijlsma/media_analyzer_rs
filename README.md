@@ -38,9 +38,9 @@ Verify your installation by typing `exiftool -ver` in your terminal.
 * **Rich Media Tagging:** Identifies special characteristics like `is_motion_photo`, `is_hdr`, `is_burst`, and
   `is_slowmotion` (`TagData`).
 
-## The `AnalyzeResult` Struct
+## The `MediaMetadata` Struct
 
-The primary output of this crate is the `AnalyzeResult` struct. It is a single, consolidated container that holds all
+The primary output of this crate is the `MediaMetadata` struct. It is a single, consolidated container that holds all
 the information gathered during the analysis pipeline, making it easy to access any piece of data you need.
 
 ## Installation
@@ -72,7 +72,7 @@ async fn main() -> Result<(), MediaAnalyzerError> {
     //    that might be shown while the real image is loading. For example, at most 10x10 pixels.
     let result = analyzer.analyze_media(media_file).await?;
 
-    // 4. Access the data from the `AnalyzeResult`.
+    // 4. Access the data from the `MediaMetadata`.
     if let Some(gps) = result.gps_info {
         println!("Location: {}, {}", gps.location.name, gps.location.country_code);
     }
