@@ -149,17 +149,15 @@ impl MediaAnalyzer {
         &self,
         media_file: &Path,
     ) -> Result<MediaMetadata, MediaAnalyzerError> {
-        let (hash, (exif_info, numeric_exif)) = tokio::task::block_in_place(|| {
-            rayon::join(
-                || hash_file(media_file),
-                || {
-                    rayon::join(
-                        || self.exiftool1.json(media_file, &["-g2"]),
-                        || self.exiftool2.json(media_file, &["-n"]),
-                    )
-                },
-            )
-        });
+        let (hash, (exif_info, numeric_exif)) = rayon::join(
+            || hash_file(media_file),
+            || {
+                rayon::join(
+                    || self.exiftool1.json(media_file, &["-g2"]),
+                    || self.exiftool2.json(media_file, &["-n"]),
+                )
+            },
+        );
         let hash = hash?;
         let exif_info = exif_info?;
         let numeric_exif = numeric_exif?;
