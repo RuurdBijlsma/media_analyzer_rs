@@ -65,10 +65,8 @@ pub fn get_metadata(exif: &Value) -> Result<(BasicMetadata, CameraSettings), Met
     let mut width = get_required_u64(exif, "ImageWidth")?;
     let mut height = get_required_u64(exif, "ImageHeight")?;
     let orientation = get_u64(exif, "Orientation");
-    let is_video_rotated = get_u64(exif, "Rotation")
-        .map(|r| r == 90 || r == 270)
-        .unwrap_or(false);
-    let is_photo_rotated = orientation.map(|o| o >= 5 && o <= 8).unwrap_or(false);
+    let is_video_rotated = get_u64(exif, "Rotation").is_some_and(|r| r == 90 || r == 270);
+    let is_photo_rotated = orientation.is_some_and(|o| (5..=8).contains(&o));
     if is_photo_rotated || is_video_rotated {
         // Swap width and height for 90 and 270-degree rotations
         mem::swap(&mut width, &mut height);
