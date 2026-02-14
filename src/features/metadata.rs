@@ -1,6 +1,7 @@
 use crate::features::error::MetadataError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::mem;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -64,12 +65,13 @@ pub fn get_metadata(exif: &Value) -> Result<(BasicMetadata, CameraSettings), Met
     let mut width = get_required_u64(exif, "ImageWidth")?;
     let mut height = get_required_u64(exif, "ImageHeight")?;
     let orientation = get_u64(exif, "Orientation");
-
-    if let Some(orientation_val) = orientation
-        && let 5..=8 = orientation_val
-    {
+    let is_video_rotated = get_u64(exif, "Rotation")
+        .map(|r| r == 90 || r == 270)
+        .unwrap_or(false);
+    let is_photo_rotated = orientation.map(|o| o >= 5 && o <= 8).unwrap_or(false);
+    if is_photo_rotated || is_video_rotated {
         // Swap width and height for 90 and 270-degree rotations
-        std::mem::swap(&mut width, &mut height);
+        mem::swap(&mut width, &mut height);
     }
     Ok((
         BasicMetadata {
@@ -215,6 +217,19 @@ mod tests {
         assert_eq!(metadata.orientation, Some(5));
         assert_eq!(metadata.width, 1800);
         assert_eq!(metadata.height, 1200);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_video_rotation_tag() -> Result<(), MediaAnalyzerError> {
+        let et = ExifTool::new()?;
+        let file = Path::new("assets/video/get_rotated_idiot.mp4");
+        let numeric_exif = et.json(file, &["-n"])?;
+        let (metadata, _) = get_metadata(&numeric_exif)?;
+
+        assert_eq!(metadata.width, 1080);
+        assert_eq!(metadata.height, 1920);
 
         Ok(())
     }
