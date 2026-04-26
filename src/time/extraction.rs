@@ -169,10 +169,10 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
                 let utc_str = if dt_str.ends_with('Z') {
                     dt_str.to_string()
                 } else {
-                    format!("{}Z", dt_str)
+                    format!("{dt_str}Z")
                 };
                 if let Some(dt_utc) = parse_datetime_utc_z(&utc_str) {
-                    potential_utc = Some((dt_utc, format!("{} (Video UTC)", field)));
+                    potential_utc = Some((dt_utc, format!("{field} (Video UTC)")));
                     break;
                 }
             }
