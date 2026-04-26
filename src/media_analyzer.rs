@@ -377,7 +377,14 @@ mod tests {
 
         let result = analyzer.analyze_media(&media_file).await?;
 
-        dbg!(result);
+        assert_eq!(
+            result.time.datetime_local.to_string(),
+            "2026-04-12 22:28:01"
+        );
+        assert_eq!(
+            result.time.datetime_utc.unwrap().naive_utc().to_string(),
+            "2026-04-12 19:28:01"
+        );
 
         Ok(())
     }

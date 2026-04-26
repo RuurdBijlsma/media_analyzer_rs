@@ -20,7 +20,6 @@ static FINDER: std::sync::LazyLock<DefaultFinder> = std::sync::LazyLock::new(Def
 
 pub fn get_time_info(exif_info: &Value, gps_info: Option<&GpsInfo>) -> Result<TimeInfo, TimeError> {
     let components = extract_time_components(exif_info);
-    dbg!(&components);
     let time_result = apply_priority_logic(components, gps_info);
     time_result.ok_or(TimeError::Extraction)
 }
@@ -48,6 +47,8 @@ fn apply_priority_logic(
         let calculated_utc_from_naive = zoned_dt.with_timezone(&Utc);
         let diff = gps_utc_dt.signed_duration_since(calculated_utc_from_naive);
 
+        // Video has difficult local dt extraction, so the `diff` can be wrong.
+        // The UTC is more trustable for video so we ignore the `diff` possibly being high in this case
         if is_video || diff.num_seconds().abs() <= MAX_NAIVE_GPS_DIFF_SECONDS {
             let offset_secs = zoned_dt.offset().fix().local_minus_utc();
             let tz_info = TimeZoneInfo {
@@ -55,11 +56,9 @@ fn apply_priority_logic(
                 offset_seconds: offset_secs,
                 source: format!("{utc_source} confirmed by {naive_source} @ GPS location"),
             };
+            // Discard `local_dt` if it comes from video
             let datetime_local = if is_video {
-                // todo make local datetime from utc time and GPS coords
-                // let x: NaiveDateTime = ...
-                // x
-                *local_dt
+                gps_utc_dt.with_timezone(&tz).naive_local()
             } else {
                 *local_dt
             };
@@ -82,8 +81,6 @@ fn apply_priority_logic(
             && let LocalResult::Single(zoned_dt) | LocalResult::Ambiguous(zoned_dt, _) =
                 tz.from_local_datetime(&local_dt)
         {
-            dbg!(&local_dt);
-            dbg!(&zoned_dt);
             return Some(TimeInfo {
                 datetime_utc: Some(zoned_dt.with_timezone(&Utc)),
                 datetime_local: local_dt,

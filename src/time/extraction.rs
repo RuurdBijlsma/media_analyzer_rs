@@ -433,17 +433,15 @@ mod tests {
     #[test]
     fn test_video_create_date_is_treated_as_utc() {
         let exif = json!({
-            "File": {
-                "MIMEType": "video/mp4"
+            "Other": {
+                "MIMEType": "video/mp4",
+                "FileName": "PXL_20260412_192436467.mp4"
             },
             "Time": {
                 "CreateDate": "2026:04:12 19:28:01",
                 "MediaCreateDate": "2026:04:12 19:28:01",
                 "FileModifyDate": "2026:04:12 21:28:01+02:00"
             },
-            "Other": {
-                "FileName": "PXL_20260412_192436467.mp4"
-            }
         });
 
         let components = extract_time_components(&exif);
