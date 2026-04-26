@@ -371,6 +371,25 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn test_video_timezone_datetime_extraction() -> Result<(), MediaAnalyzerError> {
+        let analyzer = MediaAnalyzer::builder().build().await?;
+        let media_file = asset_path("PXL_20260412_192436467.mp4");
+
+        let result = analyzer.analyze_media(&media_file).await?;
+
+        assert_eq!(
+            result.time.datetime_local.to_string(),
+            "2026-04-12 22:28:01"
+        );
+        assert_eq!(
+            result.time.datetime_utc.unwrap().naive_utc().to_string(),
+            "2026-04-12 19:28:01"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_analysis_fails_gracefully_for_non_media_file() -> Result<(), MediaAnalyzerError> {
         let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("text_file.txt");

@@ -34,6 +34,7 @@ fn apply_priority_logic(
         potential_utc,
         potential_explicit_offset,
         potential_file_dt,
+        is_video,
     } = components;
 
     // --- Priority 1: Confirmed UTC (Highest confidence) ---
@@ -46,16 +47,24 @@ fn apply_priority_logic(
         let calculated_utc_from_naive = zoned_dt.with_timezone(&Utc);
         let diff = gps_utc_dt.signed_duration_since(calculated_utc_from_naive);
 
-        if diff.num_seconds().abs() <= MAX_NAIVE_GPS_DIFF_SECONDS {
+        // Video has difficult local dt extraction, so the `diff` can be wrong.
+        // The UTC is more trustable for video so we ignore the `diff` possibly being high in this case
+        if is_video || diff.num_seconds().abs() <= MAX_NAIVE_GPS_DIFF_SECONDS {
             let offset_secs = zoned_dt.offset().fix().local_minus_utc();
             let tz_info = TimeZoneInfo {
                 name: tz.name().to_string(),
                 offset_seconds: offset_secs,
                 source: format!("{utc_source} confirmed by {naive_source} @ GPS location"),
             };
+            // Discard `local_dt` if it comes from video
+            let datetime_local = if is_video {
+                gps_utc_dt.with_timezone(&tz).naive_local()
+            } else {
+                *local_dt
+            };
             return Some(TimeInfo {
                 datetime_utc: Some(*gps_utc_dt),
-                datetime_local: *local_dt,
+                datetime_local,
                 timezone: Some(tz_info),
                 source_details: SourceDetails {
                     time_source: naive_source.clone(),
