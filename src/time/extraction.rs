@@ -15,6 +15,7 @@ pub struct ExtractedTimeComponents {
     pub potential_utc: Option<(DateTime<Utc>, String)>, // (DateTime, Source Tag Name)
     pub potential_explicit_offset: Option<(i32, String, String)>, // (Offset Seconds, Offset String, Source Tag Name)
     pub potential_file_dt: Option<(DateTime<FixedOffset>, String)>, // (DateTime, Source Tag Name)
+    pub is_video: bool,
 }
 
 /// Parses a datetime from a filename string.
@@ -31,22 +32,30 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
     let mut potential_explicit_offset: Option<(i32, String, String)> = None;
     let mut potential_file_dt: Option<(DateTime<FixedOffset>, String)> = None;
 
-    // --- Best Naive Time (DateTimeOriginal, CreateDate, etc.) with Subseconds ---
-    let naive_sources_priority = [
-        ("Time", "SubSecDateTimeOriginal", true),
-        ("Time", "SubSecCreateDate", true),
-        ("Time", "SubSecTimeDigitized", true),
-        ("Time", "DateTimeOriginal", false),
-        ("Time", "CreateDate", false),
-        ("Time", "DateTimeDigitized", false),
-        ("Time", "SubSecModifyDate", true),
-        ("Time", "ModifyDate", false),
-    ];
+    let mime = get_string_field(exif_info, "Other", "MIMEType").unwrap_or("");
+    let is_video = mime.contains("video");
+
+    // --- Best Naive Time (DateTimeOriginal, CreateDate, etc.) with SubSeconds ---
+    // Video CreateDate is UTC, not local time. We exclude it from local sources for videos.
+    let local_datetime_sources_priority = if is_video {
+        vec![("Time", "DateTimeOriginal", false)]
+    } else {
+        vec![
+            ("Time", "SubSecDateTimeOriginal", true),
+            ("Time", "SubSecCreateDate", true),
+            ("Time", "SubSecTimeDigitized", true),
+            ("Time", "DateTimeOriginal", false),
+            ("Time", "CreateDate", false),
+            ("Time", "DateTimeDigitized", false),
+            ("Time", "SubSecModifyDate", true),
+            ("Time", "ModifyDate", false),
+        ]
+    };
 
     let mut primary_naive_candidate: Option<(NaiveDateTime, String)> = None;
     let mut found_subsecond_number_source: Option<(String, u32)> = None;
 
-    for (group, field, _is_subsec_field) in naive_sources_priority {
+    for (group, field, _is_subsec_field) in &local_datetime_sources_priority {
         if primary_naive_candidate.is_none()
             && let Some(dt_str) = get_string_field(exif_info, group, field)
             && let Some((dt, parsed_subsec)) = parse_naive(dt_str)
@@ -72,7 +81,7 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
             if let Some(subsec_num) = get_number_field(exif_info, group, &sub_sec_num_field)
                 && primary_naive_candidate
                     .as_ref()
-                    .is_some_and(|(_, src)| *src == base_field_name || *src == field)
+                    .is_some_and(|(_, src)| src == &base_field_name || src == *field)
             {
                 found_subsecond_number_source = Some((sub_sec_num_field, subsec_num));
             }
@@ -83,7 +92,7 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
                 && let Some(subsec_num) = get_number_field(exif_info, group, &simpler_sub_sec_field)
                 && primary_naive_candidate
                     .as_ref()
-                    .is_some_and(|(_, src)| *src == base_field_name || *src == field)
+                    .is_some_and(|(_, src)| src == &base_field_name || src == *field)
             {
                 found_subsecond_number_source = Some((simpler_sub_sec_field, subsec_num));
             }
@@ -92,7 +101,9 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
         if primary_naive_candidate.is_some() && found_subsecond_number_source.is_some() {
             break;
         }
-        if primary_naive_candidate.is_some() && field == naive_sources_priority.last().unwrap().1 {
+        if primary_naive_candidate.is_some()
+            && *field == local_datetime_sources_priority.last().unwrap().1
+        {
             break;
         }
     }
@@ -116,6 +127,7 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
     {
         potential_utc = Some((dt_utc, "GPSDateTime".to_string()));
     }
+
     if potential_utc.is_none()
         && let (Some(date_str), Some(time_str)) = (
             get_string_field(exif_info, "Time", "GPSDateStamp"),
@@ -143,6 +155,30 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
         }
     }
 
+    // --- Potential UTC from Video Tags ---
+    if is_video && potential_utc.is_none() {
+        let video_utc_tags = [
+            "CreateDate",
+            "MediaCreateDate",
+            "TrackCreateDate",
+            "ModifyDate",
+        ];
+        for field in video_utc_tags {
+            if let Some(dt_str) = get_string_field(exif_info, "Time", field) {
+                // Ensure there is a 'Z' for UTC parsing
+                let utc_str = if dt_str.ends_with('Z') {
+                    dt_str.to_string()
+                } else {
+                    format!("{}Z", dt_str)
+                };
+                if let Some(dt_utc) = parse_datetime_utc_z(&utc_str) {
+                    potential_utc = Some((dt_utc, format!("{} (Video UTC)", field)));
+                    break;
+                }
+            }
+        }
+    }
+
     // --- Potential File Time ---
     let file_time_sources_priority = [
         ("Time", "FileModifyDate"),
@@ -166,6 +202,7 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
         potential_utc,
         potential_explicit_offset,
         potential_file_dt,
+        is_video,
     }
 }
 
@@ -391,5 +428,46 @@ mod tests {
         let (file_dt, file_source) = components.potential_file_dt.unwrap();
         assert_eq!(file_source, "FileModifyDate");
         assert_eq!(file_dt.to_rfc3339(), "2024-07-07T15:00:00-07:00");
+    }
+
+    #[test]
+    fn test_video_create_date_is_treated_as_utc() {
+        let exif = json!({
+            "File": {
+                "MIMEType": "video/mp4"
+            },
+            "Time": {
+                "CreateDate": "2026:04:12 19:28:01",
+                "MediaCreateDate": "2026:04:12 19:28:01",
+                "FileModifyDate": "2026:04:12 21:28:01+02:00"
+            },
+            "Other": {
+                "FileName": "PXL_20260412_192436467.mp4"
+            }
+        });
+
+        let components = extract_time_components(&exif);
+
+        assert!(components.is_video, "Should be identified as a video");
+        assert!(components.potential_utc.is_some());
+        let (utc_dt, utc_source) = components.potential_utc.unwrap();
+        assert_eq!(utc_source, "CreateDate (Video UTC)");
+        assert_eq!(utc_dt.to_rfc3339(), "2026-04-12T19:28:01+00:00");
+
+        // Check Local Extraction
+        // Because this is a video, 'CreateDate' (19:28:01) should NOT be in best_local.
+        // Instead, it should have fallen back to the FileName (19:24:36).
+        assert!(components.best_local.is_some());
+        let (local_dt, local_source) = components.best_local.unwrap();
+
+        assert_eq!(local_source, "FileName");
+        // Verify it picked up the 19:24:36 from the PXL filename, not 19:28:01 from EXIF
+        assert_eq!(local_dt.time().to_string(), "19:24:36");
+
+        assert_ne!(
+            local_dt.time().to_string(),
+            "19:28:01",
+            "CreateDate should not have been used as local time for a video"
+        );
     }
 }

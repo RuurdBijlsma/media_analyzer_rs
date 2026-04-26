@@ -20,6 +20,7 @@ static FINDER: std::sync::LazyLock<DefaultFinder> = std::sync::LazyLock::new(Def
 
 pub fn get_time_info(exif_info: &Value, gps_info: Option<&GpsInfo>) -> Result<TimeInfo, TimeError> {
     let components = extract_time_components(exif_info);
+    dbg!(&components);
     let time_result = apply_priority_logic(components, gps_info);
     time_result.ok_or(TimeError::Extraction)
 }
@@ -34,6 +35,7 @@ fn apply_priority_logic(
         potential_utc,
         potential_explicit_offset,
         potential_file_dt,
+        is_video,
     } = components;
 
     // --- Priority 1: Confirmed UTC (Highest confidence) ---
@@ -46,16 +48,24 @@ fn apply_priority_logic(
         let calculated_utc_from_naive = zoned_dt.with_timezone(&Utc);
         let diff = gps_utc_dt.signed_duration_since(calculated_utc_from_naive);
 
-        if diff.num_seconds().abs() <= MAX_NAIVE_GPS_DIFF_SECONDS {
+        if is_video || diff.num_seconds().abs() <= MAX_NAIVE_GPS_DIFF_SECONDS {
             let offset_secs = zoned_dt.offset().fix().local_minus_utc();
             let tz_info = TimeZoneInfo {
                 name: tz.name().to_string(),
                 offset_seconds: offset_secs,
                 source: format!("{utc_source} confirmed by {naive_source} @ GPS location"),
             };
+            let datetime_local = if is_video {
+                // todo make local datetime from utc time and GPS coords
+                // let x: NaiveDateTime = ...
+                // x
+                *local_dt
+            } else {
+                *local_dt
+            };
             return Some(TimeInfo {
                 datetime_utc: Some(*gps_utc_dt),
-                datetime_local: *local_dt,
+                datetime_local,
                 timezone: Some(tz_info),
                 source_details: SourceDetails {
                     time_source: naive_source.clone(),
@@ -72,6 +82,8 @@ fn apply_priority_logic(
             && let LocalResult::Single(zoned_dt) | LocalResult::Ambiguous(zoned_dt, _) =
                 tz.from_local_datetime(&local_dt)
         {
+            dbg!(&local_dt);
+            dbg!(&zoned_dt);
             return Some(TimeInfo {
                 datetime_utc: Some(zoned_dt.with_timezone(&Utc)),
                 datetime_local: local_dt,
