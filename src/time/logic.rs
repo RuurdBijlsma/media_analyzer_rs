@@ -187,11 +187,7 @@ fn apply_priority_logic(
         return Some(TimeInfo {
             datetime_utc: Some(utc_dt),
             datetime_local: utc_dt.naive_utc(),
-            timezone: Some(TimeZoneInfo {
-                name: "UTC".to_string(),
-                offset_seconds: 0,
-                source: utc_source.clone(),
-            }),
+            timezone: None,
             source_details: SourceDetails {
                 time_source: utc_source,
                 confidence: CONFIDENCE_HIGH.to_string(),
@@ -430,8 +426,5 @@ mod tests {
                 .and_hms_opt(18, 0, 0)
                 .unwrap()
         );
-        assert_eq!(info.timezone.as_ref().unwrap().name, "UTC");
-        assert_eq!(info.timezone.as_ref().unwrap().offset_seconds, 0);
-        assert_eq!(info.timezone.unwrap().source, "GPSDateTime");
     }
 }
