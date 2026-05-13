@@ -38,6 +38,9 @@ pub fn get_gps_info(geocoder: &ReverseGeocoder, numeric_exif: &Value) -> Option<
     ) else {
         return None;
     };
+    if latitude == 0.0 && longitude == 0.0 {
+        return None;
+    }
     let altitude = numeric_exif.get("GPSAltitude").and_then(Value::as_f64);
     let image_direction = numeric_exif.get("GPSImgDirection").and_then(Value::as_f64);
     let image_direction_ref = numeric_exif
