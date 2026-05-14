@@ -372,13 +372,19 @@ mod tests {
         assert!(result.features.is_video);
 
         // Datetime local should still be from filename
-        assert_eq!(result.time.datetime_local.to_string(), "2015-07-14 21:28:36");
+        assert_eq!(
+            result.time.datetime_local.to_string(),
+            "2015-07-14 21:28:36"
+        );
 
         // The timezone should NOT come from the broken video metadata.
         // It might fall back to a "Guessed" timezone from file metadata, which is acceptable if sane.
         if let Some(tz) = &result.time.timezone {
             assert_ne!(tz.source, "CreateDate (Video UTC)");
-            assert!(tz.offset_seconds.abs() <= 15 * 3600, "Offset should be sane");
+            assert!(
+                tz.offset_seconds.abs() <= 15 * 3600,
+                "Offset should be sane"
+            );
         }
 
         Ok(())
