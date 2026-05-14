@@ -1,6 +1,6 @@
 [package]
 name = "media_analyzer"
-version = "0.6.5"
+version = "0.6.6"
 edition = "2024"
 license = "Apache-2.0"
 description = "Extract file-based information from photo and video files."
@@ -20,20 +20,20 @@ categories = ["multimedia::images", "multimedia::video"]
 
 [dependencies]
 exiftool = "0.3.1"
-rayon = "1.10.0"
-regex = "1.12.2"
-serde_json = "1.0.140"
-tokio = { version = "1.49.0", features = ["rt-multi-thread", "rt", "macros"] }
+rayon = "1.12.0"
+regex = "1.12.3"
+serde_json = "1.0.149"
+tokio = { version = "1.52.3", features = ["rt-multi-thread", "rt", "macros"] }
 serde = { version = "1.0.228", default-features = false }
-chrono = { version = "0.4.41", default-features = false, features = ["alloc", "serde"] }
+chrono = { version = "0.4.44", default-features = false, features = ["alloc", "serde"] }
 chrono-tz = { version = "0.10.3", default-features = false, features = ["serde"] }
-tzf-rs = { version = "1.1.3", default-features = false }
-rand = { version = "0.10.0-rc.9", features = ["thread_rng"], default-features = false }
-bon = { version = "3.8.1", default-features = false }
+tzf-rs = { version = "1.3.3", default-features = false, features = ["bundled"] }
+rand = { version = "0.10.1", features = ["thread_rng"], default-features = false }
+bon = { version = "3.9.1", default-features = false }
 reverse_geocoder = "4.1.1"
 rust_iso3166 = "0.1.14"
 thiserror = { version = "2.0.17", default-features = false }
-blake3 = { version = "1.8.2", features = ["mmap", "rayon"] }
+blake3 = { version = "1.8.5", features = ["mmap", "rayon"] }
 meteostat = "0.4.6"
 sunrise = "3.0.0"
 

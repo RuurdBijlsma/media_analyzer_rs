@@ -14,6 +14,7 @@ use tzf_rs::DefaultFinder;
 
 // --- Constants specific to the logic ---
 const MAX_NAIVE_GPS_DIFF_SECONDS: i64 = 10;
+const MAX_SANE_TZ_OFFSET_SECONDS: i32 = 15 * 3600;
 
 // --- Global Timezone Finder ---
 static FINDER: std::sync::LazyLock<DefaultFinder> = std::sync::LazyLock::new(DefaultFinder::new);
@@ -125,23 +126,26 @@ fn apply_priority_logic(
             // Format offset as ±HH:MM
             let sign = if offset_seconds >= 0 { '+' } else { '-' };
             let abs_offset = offset_seconds.abs();
-            let hours = abs_offset / 3600;
-            let minutes = (abs_offset % 3600) / 60;
-            let tz_name = format!("{sign}{hours:02}:{minutes:02}");
 
-            return Some(TimeInfo {
-                datetime_utc: Some(utc_dt),
-                datetime_local: local_dt,
-                timezone: Some(TimeZoneInfo {
-                    name: tz_name,
-                    offset_seconds,
-                    source: utc_source.clone(),
-                }),
-                source_details: SourceDetails {
-                    time_source: format!("{naive_source} + {utc_source}"),
-                    confidence: CONFIDENCE_MEDIUM.to_string(),
-                },
-            });
+            if abs_offset <= MAX_SANE_TZ_OFFSET_SECONDS {
+                let hours = abs_offset / 3600;
+                let minutes = (abs_offset % 3600) / 60;
+                let tz_name = format!("{sign}{hours:02}:{minutes:02}");
+
+                return Some(TimeInfo {
+                    datetime_utc: Some(utc_dt),
+                    datetime_local: local_dt,
+                    timezone: Some(TimeZoneInfo {
+                        name: tz_name,
+                        offset_seconds,
+                        source: utc_source.clone(),
+                    }),
+                    source_details: SourceDetails {
+                        time_source: format!("{naive_source} + {utc_source}"),
+                        confidence: CONFIDENCE_MEDIUM.to_string(),
+                    },
+                });
+            }
         }
 
         // --- Priority 5: Naive With Guessed Offset ---
