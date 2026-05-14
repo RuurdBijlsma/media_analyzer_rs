@@ -216,7 +216,6 @@ mod tests {
         // For a photo, the thumbnail is the file itself.
         let result = analyzer.analyze_media(&media_file).await?;
 
-        // --- Assertions ---
         assert_eq!(result.basic.width, 5312);
         assert!(!result.features.is_video);
         assert!(!result.features.is_hdr, "sunset.jpg is not hdr");
@@ -235,7 +234,6 @@ mod tests {
         // For a photo, the thumbnail is the file itself.
         let result = analyzer.analyze_media(&media_file).await?;
 
-        // --- Assertions ---
         assert_eq!(result.basic.width, 4032);
         assert!(!result.features.is_video);
         assert!(result.features.is_hdr, "hdr.jpg is hdr");
@@ -254,7 +252,6 @@ mod tests {
         // For a photo, the thumbnail is the file itself.
         let result = analyzer.analyze_media(&media_file).await?;
 
-        // --- Assertions ---
         assert_eq!(result.basic.width, 3024);
         assert_eq!(result.basic.orientation, Some(6));
         assert!(!result.features.is_video);
@@ -273,7 +270,6 @@ mod tests {
 
         let result = analyzer.analyze_media(&media_file).await?;
 
-        // --- Assertions ---
         assert!(result.features.is_video);
         assert!(result.basic.duration.is_some());
         assert!(result.features.video_fps.is_some());
@@ -292,7 +288,6 @@ mod tests {
 
         let result = analyzer.analyze_media(&media_file).await?;
 
-        // --- Assertions ---
         assert!(
             !result.features.is_video,
             "Motion Photo is not a primary video file"
@@ -315,7 +310,6 @@ mod tests {
 
         let result = analyzer.analyze_media(&media_file).await?;
 
-        // --- Assertions ---
         assert!(result.panorama.is_photosphere);
         assert!(result.panorama.use_panorama_viewer);
         assert_eq!(
@@ -333,7 +327,6 @@ mod tests {
 
         let result = analyzer.analyze_media(&media_file).await?;
 
-        // --- Assertions ---
         assert!(result.features.is_night_sight);
 
         Ok(())
@@ -347,7 +340,6 @@ mod tests {
 
         let result = analyzer.analyze_media(&media_file).await?;
 
-        // --- Assertions ---
         assert!(result.features.is_video);
         assert!(result.features.is_slowmotion);
         assert!(!result.features.is_timelapse);
@@ -362,10 +354,32 @@ mod tests {
 
         let result = analyzer.analyze_media(&media_file).await?;
 
-        // --- Assertions ---
         assert!(result.features.is_video);
         assert!(result.features.is_timelapse);
         assert!(!result.features.is_slowmotion);
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_timezone_fail() -> Result<(), MediaAnalyzerError> {
+        let analyzer = MediaAnalyzer::builder().build().await?;
+        let media_file = asset_path("timezone_fail/small_20150714_212836.mp4");
+
+        let result = analyzer.analyze_media(&media_file).await?;
+
+        dbg!(&result.time);
+        assert!(result.features.is_video);
+
+        // Datetime local should still be from filename
+        assert_eq!(result.time.datetime_local.to_string(), "2015-07-14 21:28:36");
+
+        // The timezone should NOT come from the broken video metadata.
+        // It might fall back to a "Guessed" timezone from file metadata, which is acceptable if sane.
+        if let Some(tz) = &result.time.timezone {
+            assert_ne!(tz.source, "CreateDate (Video UTC)");
+            assert!(tz.offset_seconds.abs() <= 15 * 3600, "Offset should be sane");
+        }
 
         Ok(())
     }
