@@ -368,7 +368,6 @@ mod tests {
 
         let result = analyzer.analyze_media(&media_file).await?;
 
-        dbg!(&result.time);
         assert!(result.features.is_video);
 
         // Datetime local should still be from filename
