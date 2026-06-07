@@ -198,7 +198,8 @@ mod tests {
         );
         assert_eq!(capture_details.aperture, Some(1.8));
         assert_eq!(capture_details.exposure_time, Some(0.004));
-        assert_eq!(capture_details.focal_length, Some(85.0));
+        assert_eq!(capture_details.focal_length_in_35mm, Some(85.0));
+        assert_eq!(capture_details.focal_length, None);
     }
 
     #[test]
@@ -298,19 +299,12 @@ mod tests {
         // Test that it correctly falls back to "FocalLength" if "FocalLengthIn35mmFormat" is missing.
         let exif_data = json!({
             "ImageWidth": 100, "ImageHeight": 100, "MIMEType": "image/jpeg", "FileSize": 1024,
-            "FocalLength": 50.0 // The fallback field
+            "FocalLengthIn35mmFormat": 85.0,
+            "FocalLength": 50.0
         });
         let (_, capture_details) = get_metadata(&exif_data).unwrap();
         assert_eq!(capture_details.focal_length, Some(50.0));
-
-        // Test that it prefers "FocalLengthIn35mmFormat" when both are present.
-        let exif_data_prefer = json!({
-            "ImageWidth": 100, "ImageHeight": 100, "MIMEType": "image/jpeg", "FileSize": 1024,
-            "FocalLengthIn35mmFormat": 85.0, // The preferred field
-            "FocalLength": 50.0
-        });
-        let (_, capture_details_prefer) = get_metadata(&exif_data_prefer).unwrap();
-        assert_eq!(capture_details_prefer.focal_length, Some(85.0));
+        assert_eq!(capture_details.focal_length_in_35mm, Some(85.0));
     }
 
     #[test]

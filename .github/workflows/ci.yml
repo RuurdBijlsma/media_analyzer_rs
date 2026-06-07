@@ -31,15 +31,9 @@ jobs:
           packages: libfontconfig1-dev pkg-config exiftool
           version: 1.0
 
-      # Build the code
-      - name: Build
-        run: cargo build --all-targets --all-features
-
-      # Format check
       - name: Check formatting
         run: cargo fmt --all -- --check
 
-      # Run Clippy
       - name: Run Clippy (strict)
         run: |
           cargo clippy --all-features -- \
@@ -47,10 +41,11 @@ jobs:
           -W clippy::nursery -W rust-2018-idioms \
           -A clippy::single-match-else
 
-      # Run tests
+      - name: Build
+        run: cargo build --all-targets --all-features
+
       - name: Run tests
         run: cargo test -- --test-threads 1
 
-      # Documentation check
       - name: Check documentation
         run: cargo doc --no-deps --document-private-items
