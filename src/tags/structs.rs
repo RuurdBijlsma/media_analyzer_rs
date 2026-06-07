@@ -15,4 +15,8 @@ pub struct MediaFeatures {
     pub is_video: bool,
     pub capture_fps: Option<f64>,
     pub video_fps: Option<f64>,
+    pub audio_format: Option<String>,
+    pub audio_channels: Option<u64>,
+    pub audio_sample_rate: Option<u64>,
+    pub compressor_id: Option<String>,
 }

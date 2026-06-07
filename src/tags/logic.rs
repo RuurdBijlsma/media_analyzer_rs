@@ -86,6 +86,16 @@ pub fn extract_features(path: &Path, exif: &Value) -> MediaFeatures {
         is_video,
         capture_fps,
         video_fps,
+        compressor_id: exif
+            .get("CompressorID")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        audio_format: exif
+            .get("AudioFormat")
+            .and_then(Value::as_str)
+            .map(str::to_owned),
+        audio_channels: exif.get("AudioChannels").and_then(Value::as_u64),
+        audio_sample_rate: exif.get("AudioSampleRate").and_then(Value::as_u64),
     }
 }
 
