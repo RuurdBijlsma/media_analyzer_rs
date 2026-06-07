@@ -14,6 +14,25 @@ pub struct BasicMetadata {
     pub orientation: Option<u64>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum FlashMode {
+    Unknown,
+    CompulsoryFiring,
+    CompulsorySuppression,
+    Auto,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashInfo {
+    pub fired: bool,
+    pub mode: FlashMode,
+    pub return_detected: Option<bool>,
+    pub red_eye_reduction: bool,
+    pub flash_function_present: bool,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CameraSettings {
@@ -23,6 +42,12 @@ pub struct CameraSettings {
     pub focal_length: Option<f64>,
     pub camera_make: Option<String>,
     pub camera_model: Option<String>,
+    pub focal_length_in_35mm: Option<f64>,
+    pub lens_make: Option<String>,
+    pub lens_model: Option<String>,
+    pub flash: Option<FlashInfo>,
+    pub digital_zoom_ratio: Option<f64>,
+    pub subject_distance: Option<f64>,
 }
 
 fn get_required_u64(exif: &Value, key: &str) -> Result<u64, MetadataError> {
@@ -61,6 +86,35 @@ fn parse_duration(val: &Value) -> Option<f64> {
     })
 }
 
+const fn parse_flash(raw: u64) -> FlashInfo {
+    let fired = raw & 0x1 != 0;
+    let return_bits = (raw >> 1) & 0x3;
+    let mode_bits = (raw >> 3) & 0x3;
+    let no_flash_function = raw & (1 << 5) != 0;
+    let red_eye = raw & (1 << 6) != 0;
+
+    let mode = match mode_bits {
+        0 => FlashMode::CompulsorySuppression,
+        1 => FlashMode::CompulsoryFiring,
+        2 => FlashMode::Auto,
+        _ => FlashMode::Unknown,
+    };
+
+    let return_detected = match return_bits {
+        2 => Some(true),
+        3 => Some(false),
+        _ => None,
+    };
+
+    FlashInfo {
+        fired,
+        mode,
+        return_detected,
+        red_eye_reduction: red_eye,
+        flash_function_present: !no_flash_function,
+    }
+}
+
 pub fn get_metadata(exif: &Value) -> Result<(BasicMetadata, CameraSettings), MetadataError> {
     let mut width = get_required_u64(exif, "ImageWidth")?;
     let mut height = get_required_u64(exif, "ImageHeight")?;
@@ -83,11 +137,18 @@ pub fn get_metadata(exif: &Value) -> Result<(BasicMetadata, CameraSettings), Met
         CameraSettings {
             iso: get_u64(exif, "ISO"),
             exposure_time: get_f64(exif, "ExposureTime"),
-            aperture: get_f64(exif, "Aperture"),
-            focal_length: get_f64(exif, "FocalLengthIn35mmFormat")
-                .or_else(|| get_f64(exif, "FocalLength")),
+            aperture: get_f64(exif, "FNumber")
+                .or_else(|| get_f64(exif, "Aperture"))
+                .or_else(|| get_f64(exif, "ApertureValue")),
+            focal_length: get_f64(exif, "FocalLength"),
+            focal_length_in_35mm: get_f64(exif, "FocalLengthIn35mmFormat"),
             camera_make: get_string(exif, "Make"),
             camera_model: get_string(exif, "Model"),
+            lens_make: get_string(exif, "LensMake"),
+            lens_model: get_string(exif, "LensModel"),
+            flash: exif.get("Flash").and_then(|v| v.as_u64().map(parse_flash)),
+            digital_zoom_ratio: get_f64(exif, "DigitalZoomRatio"),
+            subject_distance: get_f64(exif, "SubjectDistance"),
         },
     ))
 }
@@ -137,7 +198,8 @@ mod tests {
         );
         assert_eq!(capture_details.aperture, Some(1.8));
         assert_eq!(capture_details.exposure_time, Some(0.004));
-        assert_eq!(capture_details.focal_length, Some(85.0));
+        assert_eq!(capture_details.focal_length_in_35mm, Some(85.0));
+        assert_eq!(capture_details.focal_length, None);
     }
 
     #[test]
@@ -237,19 +299,12 @@ mod tests {
         // Test that it correctly falls back to "FocalLength" if "FocalLengthIn35mmFormat" is missing.
         let exif_data = json!({
             "ImageWidth": 100, "ImageHeight": 100, "MIMEType": "image/jpeg", "FileSize": 1024,
-            "FocalLength": 50.0 // The fallback field
+            "FocalLengthIn35mmFormat": 85.0,
+            "FocalLength": 50.0
         });
         let (_, capture_details) = get_metadata(&exif_data).unwrap();
         assert_eq!(capture_details.focal_length, Some(50.0));
-
-        // Test that it prefers "FocalLengthIn35mmFormat" when both are present.
-        let exif_data_prefer = json!({
-            "ImageWidth": 100, "ImageHeight": 100, "MIMEType": "image/jpeg", "FileSize": 1024,
-            "FocalLengthIn35mmFormat": 85.0, // The preferred field
-            "FocalLength": 50.0
-        });
-        let (_, capture_details_prefer) = get_metadata(&exif_data_prefer).unwrap();
-        assert_eq!(capture_details_prefer.focal_length, Some(85.0));
+        assert_eq!(capture_details.focal_length_in_35mm, Some(85.0));
     }
 
     #[test]
