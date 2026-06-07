@@ -23,6 +23,17 @@ pub enum FlashMode {
     Auto,
 }
 
+impl FlashMode {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Unknown => "Unknown",
+            Self::CompulsoryFiring => "CompulsoryFiring",
+            Self::CompulsorySuppression => "CompulsorySuppression",
+            Self::Auto => "Auto",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct FlashInfo {
