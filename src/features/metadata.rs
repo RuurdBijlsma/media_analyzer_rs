@@ -59,6 +59,7 @@ pub struct CameraSettings {
     pub flash: Option<FlashInfo>,
     pub digital_zoom_ratio: Option<f64>,
     pub subject_distance: Option<f64>,
+    pub exposure_compensation: Option<f64>,
 }
 
 fn get_required_u64(exif: &Value, key: &str) -> Result<u64, MetadataError> {
@@ -160,6 +161,8 @@ pub fn get_metadata(exif: &Value) -> Result<(BasicMetadata, CameraSettings), Met
             flash: exif.get("Flash").and_then(|v| v.as_u64().map(parse_flash)),
             digital_zoom_ratio: get_f64(exif, "DigitalZoomRatio"),
             subject_distance: get_f64(exif, "SubjectDistance"),
+            exposure_compensation: get_f64(exif, "ExposureCompensation")
+                .or_else(|| get_f64(exif, "ExposureBiasValue")),
         },
     ))
 }
