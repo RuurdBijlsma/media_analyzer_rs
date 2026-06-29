@@ -11,7 +11,7 @@ fn get_tag_value<'a>(exif: &'a Value, tag_name: &str) -> Option<&'a Value> {
     let target = tag_name.to_lowercase();
     for (key, val) in obj {
         let key_lower = key.to_lowercase();
-        if key_lower == target || key_lower.ends_with(&format!(":{}", target)) {
+        if key_lower == target || key_lower.ends_with(&format!(":{target}")) {
             return Some(val);
         }
     }
@@ -65,9 +65,9 @@ pub fn should_use_pano_viewer(exif: &Value) -> bool {
 
     let projection_type = get_tag_value(exif, "ProjectionType")
         .and_then(|v| v.as_str())
-        .map(|s| s.to_lowercase());
+        .map(str::to_lowercase);
 
-    let use_viewer = match projection_type.as_deref() {
+    match projection_type.as_deref() {
         Some("equirectangular") => true,
         Some("cylindrical") => {
             // Only use the panorama viewer for cylindrical views if they cover 360 degrees
@@ -88,7 +88,5 @@ pub fn should_use_pano_viewer(exif: &Value) -> bool {
             has_gpano_dims
         }
         _ => false,
-    };
-
-    use_viewer
+    }
 }
