@@ -4,9 +4,9 @@ use super::parsing::{
     add_subseconds_from_number, parse_datetime_offset, parse_datetime_utc_z, parse_naive,
     parse_offset_string,
 };
+use crate::ExifData;
 use crate::time::filename_parsing::parse_datetime_from_filename;
 use chrono::{DateTime, FixedOffset, NaiveDateTime, Utc};
-use serde_json::Value;
 
 #[derive(Debug)]
 /// Intermediate data structure
@@ -19,20 +19,20 @@ pub struct ExtractedTimeComponents {
 }
 
 /// Parses a datetime from a filename string.
-fn parse_filename_to_naive(value: &Value) -> Option<(NaiveDateTime, String)> {
-    if let Some(filename) = get_string_field(value, "Other", "FileName") {
+fn parse_filename_to_naive(exif: &ExifData) -> Option<(NaiveDateTime, String)> {
+    if let Some(filename) = exif.group_str("Other", "FileName") {
         let result = parse_datetime_from_filename(filename);
         return result.map(|datetime| (datetime, "FileName".to_string()));
     }
     None
 }
 
-pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
+pub fn extract_time_components(exif: &ExifData) -> ExtractedTimeComponents {
     let mut potential_utc: Option<(DateTime<Utc>, String)> = None;
     let mut potential_explicit_offset: Option<(i32, String, String)> = None;
     let mut potential_file_dt: Option<(DateTime<FixedOffset>, String)> = None;
 
-    let mime = get_string_field(exif_info, "Other", "MIMEType").unwrap_or("");
+    let mime = exif.group_str("Other", "MIMEType").unwrap_or("");
     let is_video = mime.contains("video");
 
     // --- Best Naive Time (DateTimeOriginal, CreateDate, etc.) with SubSeconds ---
@@ -57,7 +57,7 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
 
     for (group, field, _is_subsec_field) in &local_datetime_sources_priority {
         if primary_naive_candidate.is_none()
-            && let Some(dt_str) = get_string_field(exif_info, group, field)
+            && let Some(dt_str) = exif.group_str(group, field)
             && let Some((dt, parsed_subsec)) = parse_naive(dt_str)
         {
             let source_name = field.to_string();
@@ -78,7 +78,7 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
                 base_field_name.replace("Date", "").replace("Time", "")
             );
 
-            if let Some(subsec_num) = get_number_field(exif_info, group, &sub_sec_num_field)
+            if let Some(subsec_num) = exif.group_u32(group, &sub_sec_num_field)
                 && primary_naive_candidate
                     .as_ref()
                     .is_some_and(|(_, src)| src == &base_field_name || src == *field)
@@ -89,7 +89,7 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
             let simpler_sub_sec_field =
                 format!("SubSecond{}", base_field_name.replace("DateTime", ""));
             if found_subsecond_number_source.is_none()
-                && let Some(subsec_num) = get_number_field(exif_info, group, &simpler_sub_sec_field)
+                && let Some(subsec_num) = exif.group_u32(group, &simpler_sub_sec_field)
                 && primary_naive_candidate
                     .as_ref()
                     .is_some_and(|(_, src)| src == &base_field_name || src == *field)
@@ -122,7 +122,7 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
     let best_local_from_exif = primary_naive_candidate;
 
     // --- Potential UTC Time ---
-    if let Some(gps_dt_str) = get_string_field(exif_info, "Time", "GPSDateTime")
+    if let Some(gps_dt_str) = exif.group_str("Time", "GPSDateTime")
         && let Some(dt_utc) = parse_datetime_utc_z(gps_dt_str)
     {
         potential_utc = Some((dt_utc, "GPSDateTime".to_string()));
@@ -130,8 +130,8 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
 
     if potential_utc.is_none()
         && let (Some(date_str), Some(time_str)) = (
-            get_string_field(exif_info, "Time", "GPSDateStamp"),
-            get_string_field(exif_info, "Time", "GPSTimeStamp"),
+            exif.group_str("Time", "GPSDateStamp"),
+            exif.group_str("Time", "GPSTimeStamp"),
         )
     {
         let combined_str = format!("{date_str} {time_str}Z");
@@ -147,7 +147,7 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
         ("Time", "OffsetTime"),
     ];
     for (group, field) in offset_sources_priority {
-        if let Some(offset_str) = get_string_field(exif_info, group, field)
+        if let Some(offset_str) = exif.group_str(group, field)
             && let Some((secs, parsed_str)) = parse_offset_string(offset_str)
         {
             potential_explicit_offset = Some((secs, parsed_str, field.to_string()));
@@ -164,7 +164,7 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
             "ModifyDate",
         ];
         for field in video_utc_tags {
-            if let Some(dt_str) = get_string_field(exif_info, "Time", field) {
+            if let Some(dt_str) = exif.group_str("Time", field) {
                 // Ensure there is a 'Z' for UTC parsing
                 let utc_str = if dt_str.ends_with('Z') {
                     dt_str.to_string()
@@ -186,7 +186,7 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
         ("Time", "FileAccessDate"),
     ];
     for (group, field) in file_time_sources_priority {
-        if let Some(dt_str) = get_string_field(exif_info, group, field)
+        if let Some(dt_str) = exif.group_str(group, field)
             && let Some(dt) = parse_datetime_offset(dt_str)
         {
             potential_file_dt = Some((dt, field.to_string()));
@@ -195,7 +195,7 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
     }
 
     // The filename is now the final fallback for best_local within the extraction step.
-    let best_local = best_local_from_exif.or_else(|| parse_filename_to_naive(exif_info));
+    let best_local = best_local_from_exif.or_else(|| parse_filename_to_naive(exif));
 
     ExtractedTimeComponents {
         best_local,
@@ -206,29 +206,16 @@ pub fn extract_time_components(exif_info: &Value) -> ExtractedTimeComponents {
     }
 }
 
-/// Safely extracts a string field from nested JSON Value.
-pub fn get_string_field<'a>(value: &'a Value, group: &str, field: &str) -> Option<&'a str> {
-    value.get(group)?.get(field)?.as_str()
-}
-
-/// Safely extracts a number field (as u32) from nested JSON Value.
-fn get_number_field(value: &Value, group: &str, field: &str) -> Option<u32> {
-    value
-        .get(group)?
-        .get(field)?
-        .as_u64()
-        .and_then(|n| u32::try_from(n).ok())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ExifData;
     use chrono::NaiveDate;
     use serde_json::json;
 
     #[test]
     fn test_extracts_nothing_from_empty_json() {
-        let exif = json!({});
+        let exif = ExifData::new(json!({}));
         let components = extract_time_components(&exif);
 
         assert!(components.best_local.is_none());
@@ -240,11 +227,11 @@ mod tests {
     #[test]
     fn test_best_local_falls_back_to_filename() {
         // This JSON has no standard EXIF date tags, so the function must parse the filename.
-        let exif = json!({
+        let exif = ExifData::new(json!({
             "Other": {
                 "FileName": "IMG_20240101_123000.jpg"
             }
-        });
+        }));
         let components = extract_time_components(&exif);
 
         assert!(components.best_local.is_some());
@@ -262,11 +249,11 @@ mod tests {
     #[test]
     fn test_best_local_falls_back_to_filename_w_fallback_tz() {
         // This JSON has no standard EXIF date tags, so the function must parse the epoch time filename.
-        let exif = json!({
+        let exif = ExifData::new(json!({
             "Other": {
                 "FileName": "1597948682906.jpg"
             }
-        });
+        }));
         let components = extract_time_components(&exif);
 
         assert!(components.best_local.is_some());
@@ -284,14 +271,14 @@ mod tests {
     #[test]
     fn test_exif_date_is_preferred_over_filename() {
         // This JSON has both a valid EXIF tag and a filename. The EXIF tag should win.
-        let exif = json!({
+        let exif = ExifData::new(json!({
             "Time": {
                 "DateTimeOriginal": "2025:02:02 11:11:11"
             },
             "Other": {
                 "FileName": "IMG_20240101_123000.jpg"
             }
-        });
+        }));
         let components = extract_time_components(&exif);
 
         assert!(components.best_local.is_some());
@@ -309,12 +296,12 @@ mod tests {
     #[test]
     fn test_naive_time_priority_logic() {
         // CreateDate is lower priority than DateTimeOriginal
-        let exif = json!({
+        let exif = ExifData::new(json!({
             "Time": {
                 "CreateDate": "2023:01:01 10:00:00",
                 "DateTimeOriginal": "2024:02:02 12:34:56"
             }
-        });
+        }));
 
         let components = extract_time_components(&exif);
         assert!(components.best_local.is_some());
@@ -333,11 +320,11 @@ mod tests {
     #[test]
     fn test_naive_time_with_parsed_subseconds() {
         // Subseconds are part of the string itself
-        let exif = json!({
+        let exif = ExifData::new(json!({
             "Time": {
                 "SubSecDateTimeOriginal": "2024:03:03 11:22:33.123"
             }
-        });
+        }));
 
         let components = extract_time_components(&exif);
         let (local_dt, source) = components.best_local.unwrap();
@@ -355,12 +342,12 @@ mod tests {
     #[test]
     fn test_naive_time_with_separate_subsecond_field() {
         // Subseconds are in a separate numeric tag
-        let exif = json!({
+        let exif = ExifData::new(json!({
             "Time": {
                 "DateTimeOriginal": "2024:04:04 14:15:16",
                 "SubSecTimeOriginal": 456
             }
-        });
+        }));
 
         let components = extract_time_components(&exif);
         let (local_dt, source) = components.best_local.unwrap();
@@ -379,21 +366,21 @@ mod tests {
     #[test]
     fn test_utc_time_extraction() {
         // Primary case: GPSDateTime
-        let exif_gps_dt = json!({
+        let exif_gps_dt = ExifData::new(json!({
             "Time": { "GPSDateTime": "2024:05:05 10:00:00Z" }
-        });
+        }));
         let components_1 = extract_time_components(&exif_gps_dt);
         let (utc_dt_1, source_1) = components_1.potential_utc.unwrap();
         assert_eq!(source_1, "GPSDateTime");
         assert_eq!(utc_dt_1.to_rfc3339(), "2024-05-05T10:00:00+00:00");
 
         // Fallback case: GPSDateStamp + GPSTimeStamp
-        let exif_gps_stamps = json!({
+        let exif_gps_stamps = ExifData::new(json!({
             "Time": {
                 "GPSDateStamp": "2024:06:06",
                 "GPSTimeStamp": "11:22:33"
             }
-        });
+        }));
         let components_2 = extract_time_components(&exif_gps_stamps);
         let (utc_dt_2, source_2) = components_2.potential_utc.unwrap();
         assert_eq!(source_2, "GPSDateStamp/GPSTimeStamp");
@@ -402,7 +389,7 @@ mod tests {
 
     #[test]
     fn test_offset_and_file_time_priority() {
-        let exif = json!({
+        let exif = ExifData::new(json!({
             "Time": {
                 // Offset: Original is highest priority
                 "OffsetTime": "+05:00",
@@ -412,7 +399,7 @@ mod tests {
                 "FileAccessDate": "2023:01:01 10:00:00+01:00",
                 "FileModifyDate": "2024:07:07 15:00:00-07:00"
             }
-        });
+        }));
 
         let components = extract_time_components(&exif);
 
@@ -432,7 +419,7 @@ mod tests {
 
     #[test]
     fn test_video_create_date_is_treated_as_utc() {
-        let exif = json!({
+        let exif = ExifData::new(json!({
             "Other": {
                 "MIMEType": "video/mp4",
                 "FileName": "PXL_20260412_192436467.mp4"
@@ -442,7 +429,7 @@ mod tests {
                 "MediaCreateDate": "2026:04:12 19:28:01",
                 "FileModifyDate": "2026:04:12 21:28:01+02:00"
             },
-        });
+        }));
 
         let components = extract_time_components(&exif);
 

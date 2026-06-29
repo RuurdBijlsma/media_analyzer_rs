@@ -1,3 +1,4 @@
+use crate::ExifData;
 use crate::MediaAnalyzerError;
 use crate::features::gps::get_gps_info;
 use crate::features::hashing::hash_file;
@@ -30,8 +31,7 @@ use std::path::{Path, PathBuf};
 /// ```
 pub struct MediaAnalyzer {
     geocoder: ReverseGeocoder,
-    exiftool1: ExifTool,
-    exiftool2: ExifTool,
+    exiftool: ExifTool,
     meteostat: Meteostat,
     weather_search_radius_km: f64,
 }
@@ -75,11 +75,7 @@ impl MediaAnalyzer {
         cache_folder: Option<PathBuf>,
         #[builder(default = 100.0)] weather_search_radius_km: f64,
     ) -> Result<Self, MediaAnalyzerError> {
-        let exiftool1 = match exiftool_path {
-            Some(path) => ExifTool::with_executable(path)?,
-            None => ExifTool::new()?,
-        };
-        let exiftool2 = match exiftool_path {
+        let exiftool = match exiftool_path {
             Some(path) => ExifTool::with_executable(path)?,
             None => ExifTool::new()?,
         };
@@ -90,8 +86,7 @@ impl MediaAnalyzer {
         let geocoder = ReverseGeocoder::new();
         Ok(Self {
             geocoder,
-            exiftool1,
-            exiftool2,
+            exiftool,
             meteostat,
             weather_search_radius_km,
         })
@@ -110,7 +105,7 @@ impl MediaAnalyzer {
     /// # Returns
     ///
     /// On success, returns a `Result` containing an [`MediaMetadata`] struct with the following fields:
-    /// * `exif`: The raw, grouped (`-g2`) JSON output from `exiftool`.
+    /// * `exif`: The raw, grouped numeric (`-n -g2`) JSON output from `exiftool`.
     /// * `metadata`: Core file properties like width, height, and duration.
     /// * `capture_details`: Photographic details like ISO, aperture, and camera model.
     /// * `tags`: Boolean flags for special media types (e.g., `is_motion_photo`, `is_slowmotion`).
@@ -149,24 +144,19 @@ impl MediaAnalyzer {
         &self,
         media_file: &Path,
     ) -> Result<MediaMetadata, MediaAnalyzerError> {
-        let (hash, (exif_info, numeric_exif)) = rayon::join(
+        let (hash, exif_value) = rayon::join(
             || hash_file(media_file),
-            || {
-                rayon::join(
-                    || self.exiftool1.json(media_file, &["-g2"]),
-                    || self.exiftool2.json(media_file, &["-n"]),
-                )
-            },
+            || self.exiftool.json(media_file, &["-n", "-g2"]),
         );
         let hash = hash?;
-        let exif_info = exif_info?;
-        let numeric_exif = numeric_exif?;
+        let exif_value = exif_value?;
+        let exif = ExifData::new(exif_value.clone());
 
-        let (basic, camera) = get_metadata(&numeric_exif)?;
-        let features = extract_features(media_file, &numeric_exif);
-        let gps = get_gps_info(&self.geocoder, &numeric_exif);
-        let use_panorama_viewer = should_use_pano_viewer(&numeric_exif);
-        let time = get_time_info(&exif_info, gps.as_ref())?;
+        let (basic, camera) = get_metadata(&exif)?;
+        let features = extract_features(media_file, &exif);
+        let gps = get_gps_info(&self.geocoder, &exif);
+        let use_panorama_viewer = should_use_pano_viewer(&exif);
+        let time = get_time_info(&exif, gps.as_ref())?;
 
         let weather = if let (Some(gps), Some(utc_time)) = (gps.as_ref(), time.datetime_utc) {
             get_weather_info(
@@ -183,7 +173,7 @@ impl MediaAnalyzer {
 
         Ok(MediaMetadata {
             hash,
-            exif: exif_info,
+            exif: exif_value,
             features,
             time,
             gps,

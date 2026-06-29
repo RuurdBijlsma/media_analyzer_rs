@@ -1,3 +1,4 @@
+use crate::ExifData;
 use crate::features::error::MetadataError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -62,31 +63,6 @@ pub struct CameraSettings {
     pub exposure_compensation: Option<f64>,
 }
 
-fn get_required_u64(exif: &Value, key: &str) -> Result<u64, MetadataError> {
-    exif.get(key)
-        .and_then(Value::as_u64)
-        .ok_or_else(|| MetadataError::MissingRequiredField(key.to_string()))
-}
-
-fn get_required_string(exif: &Value, key: &str) -> Result<String, MetadataError> {
-    exif.get(key)
-        .and_then(Value::as_str)
-        .map(str::to_owned)
-        .ok_or_else(|| MetadataError::MissingRequiredField(key.to_string()))
-}
-
-fn get_f64(exif: &Value, key: &str) -> Option<f64> {
-    exif.get(key).and_then(Value::as_f64)
-}
-
-fn get_u64(exif: &Value, key: &str) -> Option<u64> {
-    exif.get(key).and_then(Value::as_u64)
-}
-
-fn get_string(exif: &Value, key: &str) -> Option<String> {
-    exif.get(key).and_then(Value::as_str).map(str::to_owned)
-}
-
 fn parse_duration(val: &Value) -> Option<f64> {
     if let Some(d) = val.as_f64() {
         return Some(d);
@@ -127,11 +103,13 @@ const fn parse_flash(raw: u64) -> FlashInfo {
     }
 }
 
-pub fn get_metadata(exif: &Value) -> Result<(BasicMetadata, CameraSettings), MetadataError> {
-    let mut width = get_required_u64(exif, "ImageWidth")?;
-    let mut height = get_required_u64(exif, "ImageHeight")?;
-    let orientation = get_u64(exif, "Orientation");
-    let is_video_rotated = get_u64(exif, "Rotation").is_some_and(|r| r == 90 || r == 270);
+pub fn get_metadata(exif: &ExifData) -> Result<(BasicMetadata, CameraSettings), MetadataError> {
+    let mut width = exif.require_u64("ImageWidth")?;
+    let mut height = exif.require_u64("ImageHeight")?;
+    let orientation = exif.get_u64("Orientation");
+    let is_video_rotated = exif
+        .get_u64("Rotation")
+        .is_some_and(|r| r == 90 || r == 270);
     let is_photo_rotated = orientation.is_some_and(|o| (5..=8).contains(&o));
     if is_photo_rotated || is_video_rotated {
         // Swap width and height for 90 and 270-degree rotations
@@ -141,28 +119,36 @@ pub fn get_metadata(exif: &Value) -> Result<(BasicMetadata, CameraSettings), Met
         BasicMetadata {
             width,
             height,
-            mime_type: get_required_string(exif, "MIMEType")?,
-            size_bytes: get_required_u64(exif, "FileSize")?,
+            mime_type: exif.require_string("MIMEType")?,
+            size_bytes: exif.require_u64("FileSize")?,
             orientation,
-            duration: exif.get("Duration").and_then(parse_duration),
+            duration: exif.get_value("Duration").and_then(parse_duration),
         },
         CameraSettings {
-            iso: get_u64(exif, "ISO"),
-            exposure_time: get_f64(exif, "ExposureTime"),
-            aperture: get_f64(exif, "FNumber")
-                .or_else(|| get_f64(exif, "Aperture"))
-                .or_else(|| get_f64(exif, "ApertureValue")),
-            focal_length: get_f64(exif, "FocalLength"),
-            focal_length_in_35mm: get_f64(exif, "FocalLengthIn35mmFormat"),
-            camera_make: get_string(exif, "Make").or_else(|| get_string(exif, "AndroidMake")),
-            camera_model: get_string(exif, "Model").or_else(|| get_string(exif, "AndroidModel")),
-            lens_make: get_string(exif, "LensMake"),
-            lens_model: get_string(exif, "LensModel"),
-            flash: exif.get("Flash").and_then(|v| v.as_u64().map(parse_flash)),
-            digital_zoom_ratio: get_f64(exif, "DigitalZoomRatio"),
-            subject_distance: get_f64(exif, "SubjectDistance"),
-            exposure_compensation: get_f64(exif, "ExposureCompensation")
-                .or_else(|| get_f64(exif, "ExposureBiasValue")),
+            iso: exif.get_u64("ISO"),
+            exposure_time: exif.get_f64("ExposureTime"),
+            aperture: exif
+                .get_f64("FNumber")
+                .or_else(|| exif.get_f64("Aperture"))
+                .or_else(|| exif.get_f64("ApertureValue")),
+            focal_length: exif.get_f64("FocalLength"),
+            focal_length_in_35mm: exif.get_f64("FocalLengthIn35mmFormat"),
+            camera_make: exif
+                .get_string("Make")
+                .or_else(|| exif.get_string("AndroidMake")),
+            camera_model: exif
+                .get_string("Model")
+                .or_else(|| exif.get_string("AndroidModel")),
+            lens_make: exif.get_string("LensMake"),
+            lens_model: exif.get_string("LensModel"),
+            flash: exif
+                .get_value("Flash")
+                .and_then(|v| v.as_u64().map(parse_flash)),
+            digital_zoom_ratio: exif.get_f64("DigitalZoomRatio"),
+            subject_distance: exif.get_f64("SubjectDistance"),
+            exposure_compensation: exif
+                .get_f64("ExposureCompensation")
+                .or_else(|| exif.get_f64("ExposureBiasValue")),
         },
     ))
 }
@@ -179,7 +165,7 @@ mod tests {
     #[test]
     fn test_get_metadata_with_full_photo_data() {
         // Simulate a rich EXIF block from a photo
-        let exif_data = json!({
+        let exif_data = ExifData::new(json!({
             "ImageWidth": 4000,
             "ImageHeight": 3000,
             "MIMEType": "image/jpeg",
@@ -190,7 +176,7 @@ mod tests {
             "Aperture": 1.8,
             "ExposureTime": 0.004, // 1/250s
             "FocalLengthIn35mmFormat": 85.0
-        });
+        }));
 
         let result = get_metadata(&exif_data);
         assert!(result.is_ok(), "Should successfully parse full EXIF data");
@@ -219,13 +205,13 @@ mod tests {
     #[test]
     fn test_get_metadata_with_minimal_video_data() {
         // Simulate minimal EXIF from a video file
-        let exif_data = json!({
+        let exif_data = ExifData::new(json!({
             "ImageWidth": 1920,
             "ImageHeight": 1080,
             "MIMEType": "video/mp4",
             "FileSize": 15_728_640, // 15 MB
             "Duration": 10.53
-        });
+        }));
 
         let result = get_metadata(&exif_data);
         assert!(
@@ -254,10 +240,10 @@ mod tests {
     #[test]
     fn test_get_metadata_with_string_duration() {
         // Verifies the new case (e.g., from WebM files)
-        let exif_data = json!({
+        let exif_data = ExifData::new(json!({
             "ImageWidth": 1280, "ImageHeight": 720, "MIMEType": "video/webm", "FileSize": 1_000_000,
             "Duration": "00:00:05.874000000"
-        });
+        }));
         let (metadata, _) = get_metadata(&exif_data).unwrap();
         assert!(
             metadata.duration.is_some(),
@@ -270,10 +256,10 @@ mod tests {
     #[test]
     fn test_get_metadata_handles_malformed_string_duration() {
         // Ensures that a bad string format doesn't cause a panic.
-        let exif_data = json!({
+        let exif_data = ExifData::new(json!({
             "ImageWidth": 1280, "ImageHeight": 720, "MIMEType": "video/webm", "FileSize": 1_000_000,
             "Duration": "5 seconds"
-        });
+        }));
         let (metadata, _) = get_metadata(&exif_data).unwrap();
         assert!(
             metadata.duration.is_none(),
@@ -285,7 +271,7 @@ mod tests {
     fn test_orientation_tag() -> Result<(), MediaAnalyzerError> {
         let et = ExifTool::new()?;
         let file = Path::new("assets/orientation-5.jpg");
-        let numeric_exif = et.json(file, &["-n"])?;
+        let numeric_exif = ExifData::new(et.json(file, &["-n", "-g2"])?);
         let (metadata, _) = get_metadata(&numeric_exif)?;
 
         assert_eq!(metadata.orientation, Some(5));
@@ -299,7 +285,7 @@ mod tests {
     fn test_video_rotation_tag() -> Result<(), MediaAnalyzerError> {
         let et = ExifTool::new()?;
         let file = Path::new("assets/video/get_rotated_idiot.mp4");
-        let numeric_exif = et.json(file, &["-n"])?;
+        let numeric_exif = ExifData::new(et.json(file, &["-n", "-g2"])?);
         let (metadata, _) = get_metadata(&numeric_exif)?;
 
         assert_eq!(metadata.width, 1080);
@@ -311,11 +297,11 @@ mod tests {
     #[test]
     fn test_focal_length_fallback_logic() {
         // Test that it correctly falls back to "FocalLength" if "FocalLengthIn35mmFormat" is missing.
-        let exif_data = json!({
+        let exif_data = ExifData::new(json!({
             "ImageWidth": 100, "ImageHeight": 100, "MIMEType": "image/jpeg", "FileSize": 1024,
             "FocalLengthIn35mmFormat": 85.0,
             "FocalLength": 50.0
-        });
+        }));
         let (_, capture_details) = get_metadata(&exif_data).unwrap();
         assert_eq!(capture_details.focal_length, Some(50.0));
         assert_eq!(capture_details.focal_length_in_35mm, Some(85.0));
@@ -324,9 +310,9 @@ mod tests {
     #[test]
     fn test_fails_when_required_field_is_missing() {
         // Test case for missing "ImageWidth"
-        let missing_width = json!({
+        let missing_width = ExifData::new(json!({
             "ImageHeight": 100, "MIMEType": "image/jpeg", "FileSize": 1024
-        });
+        }));
         let result_width = get_metadata(&missing_width);
         assert!(
             matches!(result_width.unwrap_err(), MetadataError::MissingRequiredField(field) if field == "ImageWidth"),
@@ -334,9 +320,9 @@ mod tests {
         );
 
         // Test case for missing "MIMEType"
-        let missing_mime = json!({
+        let missing_mime = ExifData::new(json!({
             "ImageWidth": 100, "ImageHeight": 100, "FileSize": 1024
-        });
+        }));
         let result_mime = get_metadata(&missing_mime);
         assert!(
             matches!(result_mime.unwrap_err(), MetadataError::MissingRequiredField(field) if field == "MIMEType"),

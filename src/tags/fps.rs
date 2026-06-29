@@ -1,15 +1,16 @@
+use crate::ExifData;
 use serde_json::Value;
 
-pub fn get_fps(value: &Value) -> (Option<f64>, Option<f64>) {
-    let video_fps = value
-        .get("AvgFrameRate")
-        .or_else(|| value.get("FrameRate"))
-        .or_else(|| value.get("VideoFrameRate"))
+pub fn get_fps(exif: &ExifData) -> (Option<f64>, Option<f64>) {
+    let video_fps = exif
+        .get_value("AvgFrameRate")
+        .or_else(|| exif.get_value("FrameRate"))
+        .or_else(|| exif.get_value("VideoFrameRate"))
         .and_then(parse_fps);
 
-    let capture_fps = value
-        .get("AndroidCaptureFPS")
-        .or_else(|| value.get("SourceFrameRate"))
+    let capture_fps = exif
+        .get_value("AndroidCaptureFPS")
+        .or_else(|| exif.get_value("SourceFrameRate"))
         .and_then(parse_fps)
         .or(video_fps);
 
@@ -39,6 +40,7 @@ pub fn parse_fps(value: &Value) -> Option<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ExifData;
     use serde_json::json;
 
     // --- Unit tests for the helper `parse_fps` function ---
@@ -103,10 +105,10 @@ mod tests {
 
         #[test]
         fn test_gets_primary_video_and_capture_fps() {
-            let exif = json!({
+            let exif = ExifData::new(json!({
                 "AvgFrameRate": 30.0,
                 "AndroidCaptureFPS": "120"
-            });
+            }));
             let (video_fps, capture_fps) = get_fps(&exif);
             assert_eq!(video_fps, Some(30.0));
             assert_eq!(capture_fps, Some(120.0));
@@ -115,22 +117,22 @@ mod tests {
         #[test]
         fn test_video_fps_fallback_logic() {
             // AvgFrameRate is missing, should fall back to FrameRate
-            let exif_fallback1 = json!({ "FrameRate": 25.0 });
+            let exif_fallback1 = ExifData::new(json!({ "FrameRate": 25.0 }));
             let (video_fps1, _) = get_fps(&exif_fallback1);
             assert_eq!(video_fps1, Some(25.0));
 
             // FrameRate is missing, should fall back to VideoFrameRate
-            let exif_fallback2 = json!({ "VideoFrameRate": "50" });
+            let exif_fallback2 = ExifData::new(json!({ "VideoFrameRate": "50" }));
             let (video_fps2, _) = get_fps(&exif_fallback2);
             assert_eq!(video_fps2, Some(50.0));
         }
 
         #[test]
         fn test_capture_fps_fallback_to_sourceframerate() {
-            let exif = json!({
+            let exif = ExifData::new(json!({
                 "AvgFrameRate": 30.0,
                 "SourceFrameRate": 240.0
-            });
+            }));
             let (video_fps, capture_fps) = get_fps(&exif);
             assert_eq!(video_fps, Some(30.0));
             assert_eq!(capture_fps, Some(240.0));
@@ -140,9 +142,9 @@ mod tests {
         fn test_capture_fps_falls_back_to_video_fps() {
             // This is the most important logic: if no specific capture FPS tags are found,
             // capture_fps should equal video_fps.
-            let exif = json!({
+            let exif = ExifData::new(json!({
                 "AvgFrameRate": "30000/1001"
-            });
+            }));
             let (video_fps, capture_fps) = get_fps(&exif);
             assert!(video_fps.is_some());
             // They should be exactly equal
@@ -151,7 +153,7 @@ mod tests {
 
         #[test]
         fn test_returns_none_when_no_fps_tags_present() {
-            let exif = json!({ "ImageWidth": 1024 }); // Some other tag
+            let exif = ExifData::new(json!({ "ImageWidth": 1024 })); // Some other tag
             let (video_fps, capture_fps) = get_fps(&exif);
             assert!(video_fps.is_none());
             assert!(capture_fps.is_none());
@@ -159,11 +161,11 @@ mod tests {
 
         #[test]
         fn test_handles_mixed_data_types() {
-            let exif = json!({
+            let exif = ExifData::new(json!({
                 "AvgFrameRate": "60",         // String integer
                 "AndroidCaptureFPS": 240.0,  // JSON number
                 "SourceFrameRate": "120/1"   // String fraction
-            });
+            }));
             // It should prefer AndroidCaptureFPS over SourceFrameRate
             let (video_fps, capture_fps) = get_fps(&exif);
             assert_eq!(video_fps, Some(60.0));

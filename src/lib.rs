@@ -89,6 +89,7 @@
 //! ```
 
 mod error;
+mod exif_data;
 mod features;
 mod media_analyzer;
 mod structs;
@@ -96,6 +97,7 @@ mod tags;
 mod time;
 
 // --- Public API Exports ---
+pub use exif_data::ExifData;
 pub use media_analyzer::MediaAnalyzer;
 pub use media_analyzer::MediaAnalyzerBuilder;
 
