@@ -2,13 +2,13 @@
 
 use super::error::TimeError;
 use super::extraction::{ExtractedTimeComponents, extract_time_components};
+use crate::ExifData;
 use crate::GpsInfo;
 use crate::time::structs::{
     CONFIDENCE_HIGH, CONFIDENCE_LOW, CONFIDENCE_MEDIUM, SourceDetails, TimeInfo, TimeZoneInfo,
 };
 use chrono::{FixedOffset, LocalResult, Offset, TimeZone, Utc};
 use chrono_tz::Tz;
-use serde_json::Value;
 use std::str::FromStr;
 use tzf_rs::DefaultFinder;
 
@@ -19,8 +19,8 @@ const MAX_SANE_TZ_OFFSET_SECONDS: i32 = 15 * 3600;
 // --- Global Timezone Finder ---
 static FINDER: std::sync::LazyLock<DefaultFinder> = std::sync::LazyLock::new(DefaultFinder::new);
 
-pub fn get_time_info(exif_info: &Value, gps_info: Option<&GpsInfo>) -> Result<TimeInfo, TimeError> {
-    let components = extract_time_components(exif_info);
+pub fn get_time_info(exif: &ExifData, gps_info: Option<&GpsInfo>) -> Result<TimeInfo, TimeError> {
+    let components = extract_time_components(exif);
     let time_result = apply_priority_logic(components, gps_info);
     time_result.ok_or(TimeError::Extraction)
 }
@@ -223,6 +223,7 @@ fn apply_priority_logic(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ExifData;
     use crate::features::gps::get_gps_info;
     use crate::{LocationName, MediaAnalyzerError};
     use chrono::NaiveDate;
@@ -259,8 +260,8 @@ mod tests {
         }
     }
 
-    fn get_full_exif() -> Value {
-        from_str(r#"{
+    fn get_full_exif() -> ExifData {
+        ExifData::new(from_str(r#"{
             "Time": {
                 "FileModifyDate": "2025:02:26 19:14:06+01:00",
                 "ModifyDate": "2017:11:06 11:03:20",
@@ -273,11 +274,11 @@ mod tests {
                 "GPSDateTime": "2017:11:06 10:03:19Z"
             },
             "Location": { "GPSLatitude": "53 deg 12' 45.68\" N", "GPSLongitude": "6 deg 33' 46.93\" E" }
-            }"#).unwrap()
+            }"#).unwrap())
     }
 
-    fn get_basic_exif() -> Value {
-        from_str(
+    fn get_basic_exif() -> ExifData {
+        ExifData::new(from_str(
             r#"{
         "Time": {
         "FileModifyDate": "2011:01:01 15:26:40+01:00",
@@ -287,7 +288,7 @@ mod tests {
         }
         }"#,
         )
-        .unwrap()
+        .unwrap())
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -295,10 +296,9 @@ mod tests {
         // Arrange
         let image = Path::new("assets/tz-offset-bug/IMG_20170904_101507.jpg");
         let et = ExifTool::new()?;
-        let exif = et.json(image, &["-g2"])?;
+        let exif = ExifData::new(et.json(image, &["-n", "-g2"])?);
         let geocoder = ReverseGeocoder::new();
-        let numeric_exif = et.json(image, &["-n"])?;
-        let gps_info = get_gps_info(&geocoder, &numeric_exif);
+        let gps_info = get_gps_info(&geocoder, &exif);
 
         // Act
         let time_info = get_time_info(&exif, gps_info.as_ref())?;
@@ -394,8 +394,7 @@ mod tests {
 
     #[test]
     fn test_priority6_naive_only_low_confidence() {
-        let exif =
-            from_str(r#"{ "Time": { "DateTimeOriginal": "2023-05-10 10:00:00" } }"#).unwrap();
+        let exif = ExifData::new(from_str(r#"{ "Time": { "DateTimeOriginal": "2023-05-10 10:00:00" } }"#).unwrap());
         let info = get_time_info(&exif, None).unwrap();
 
         assert_eq!(
@@ -414,7 +413,7 @@ mod tests {
 
     #[test]
     fn test_priority7_utc_only_with_fallback_timezone() {
-        let exif = from_str(r#"{ "Time": { "GPSDateTime": "2022-08-15T18:00:00Z" } }"#).unwrap();
+        let exif = ExifData::new(from_str(r#"{ "Time": { "GPSDateTime": "2022-08-15T18:00:00Z" } }"#).unwrap());
         let info = get_time_info(&exif, None).unwrap();
 
         // UTC time is known and accurate.

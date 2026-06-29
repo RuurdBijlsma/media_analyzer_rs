@@ -1,5 +1,5 @@
+use crate::ExifData;
 use regex::Regex;
-use serde_json::Value;
 use std::sync::LazyLock;
 
 // Captures the common filename prefix before "_burst".
@@ -23,15 +23,14 @@ pub fn detect_burst_from_filename(filename_lower: &str) -> (bool, Option<String>
 }
 
 /// Orchestrates burst detection using a multi-layered approach for maximum compatibility.
-pub fn find_burst_info(exif: &Value, filename_lower: &str) -> (bool, Option<String>) {
+pub fn find_burst_info(exif: &ExifData, filename_lower: &str) -> (bool, Option<String>) {
     // Layer 1: Check for explicit EXIF burst tags (most reliable method).
     // - BurstUUID is the standard for Apple devices.
     // - GCamera:BurstId is a specific XMP tag used by Google Camera.
     let exif_burst_id = exif
-        .get("BurstUUID")
-        .or_else(|| exif.get("GCamera:BurstId"))
-        .or_else(|| exif.get("BurstId"))
-        .and_then(|v| v.as_str().map(String::from));
+        .get_string("BurstUUID")
+        .or_else(|| exif.get_string("GCamera:BurstId"))
+        .or_else(|| exif.get_string("BurstId"));
 
     if let Some(id) = exif_burst_id
         && !id.is_empty()
@@ -46,6 +45,7 @@ pub fn find_burst_info(exif: &Value, filename_lower: &str) -> (bool, Option<Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ExifData;
     use serde_json::json;
 
     // --- Tests for the orchestrator `find_burst_info` function ---
@@ -53,11 +53,11 @@ mod tests {
     #[test]
     fn test_find_burst_prefers_exif_burstuuid() {
         // Test that the Apple 'BurstUUID' is prioritized over other tags and the filename.
-        let exif_data = json!({
+        let exif_data = ExifData::new(json!({
             "BurstUUID": "APPLE-BURST-ID-123",
             "GCamera:BurstId": "GOOGLE-BURST-ID-456",
             "BurstId": "GENERIC-BURST-ID-789"
-        });
+        }));
         let filename = "some_burst_filename.jpg";
 
         let (is_burst, burst_id) = find_burst_info(&exif_data, filename);
@@ -69,10 +69,10 @@ mod tests {
     #[test]
     fn test_find_burst_uses_gcamera_burstid() {
         // Test that the Google 'GCamera:BurstId' is used when BurstUUID is absent.
-        let exif_data = json!({
+        let exif_data = ExifData::new(json!({
             "GCamera:BurstId": "GOOGLE-BURST-ID-456",
             "BurstId": "GENERIC-BURST-ID-789"
-        });
+        }));
         let filename = "some_burst_filename.jpg";
 
         let (is_burst, burst_id) = find_burst_info(&exif_data, filename);
@@ -84,9 +84,9 @@ mod tests {
     #[test]
     fn test_find_burst_uses_generic_burstid() {
         // Test that the generic 'BurstId' is used when others are absent.
-        let exif_data = json!({
+        let exif_data = ExifData::new(json!({
             "BurstId": "GENERIC-BURST-ID-789"
-        });
+        }));
         let filename = "some_burst_filename.jpg";
 
         let (is_burst, burst_id) = find_burst_info(&exif_data, filename);
@@ -98,7 +98,7 @@ mod tests {
     #[test]
     fn test_find_burst_falls_back_to_filename() {
         // Test that when no EXIF tags are present, it correctly falls back to the filename.
-        let exif_data = json!({}); // No burst tags
+        let exif_data = ExifData::new(json!({})); // No burst tags
         let filename = "20150813_160421_burst01.jpg";
 
         let (is_burst, burst_id) = find_burst_info(&exif_data, filename);
@@ -110,7 +110,7 @@ mod tests {
     #[test]
     fn test_find_burst_handles_empty_exif_tag() {
         // Test that if the EXIF tag is present but empty, it correctly falls back to the filename.
-        let exif_data = json!({ "BurstUUID": "" });
+        let exif_data = ExifData::new(json!({ "BurstUUID": "" }));
         let filename = "google_burst_abc.jpg";
 
         let (is_burst, burst_id) = find_burst_info(&exif_data, filename);
@@ -122,7 +122,7 @@ mod tests {
     #[test]
     fn test_find_burst_returns_none_for_non_burst() {
         // Test the most common case: no burst information anywhere.
-        let exif_data = json!({});
+        let exif_data = ExifData::new(json!({}));
         let filename = "a_regular_photo.jpg";
 
         let (is_burst, burst_id) = find_burst_info(&exif_data, filename);

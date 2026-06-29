@@ -1,6 +1,6 @@
+use crate::ExifData;
 use reverse_geocoder::ReverseGeocoder;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum DirectionRef {
@@ -31,21 +31,18 @@ pub struct LocationName {
     pub country_name: Option<String>,
 }
 
-pub fn get_gps_info(geocoder: &ReverseGeocoder, numeric_exif: &Value) -> Option<GpsInfo> {
-    let (Some(latitude), Some(longitude)) = (
-        numeric_exif.get("GPSLatitude").and_then(Value::as_f64),
-        numeric_exif.get("GPSLongitude").and_then(Value::as_f64),
-    ) else {
+pub fn get_gps_info(geocoder: &ReverseGeocoder, exif: &ExifData) -> Option<GpsInfo> {
+    let (Some(latitude), Some(longitude)) = (exif.get_f64("GPSLatitude"), exif.get_f64("GPSLongitude"))
+    else {
         return None;
     };
     if latitude == 0.0 && longitude == 0.0 {
         return None;
     }
-    let altitude = numeric_exif.get("GPSAltitude").and_then(Value::as_f64);
-    let image_direction = numeric_exif.get("GPSImgDirection").and_then(Value::as_f64);
-    let image_direction_ref = numeric_exif
-        .get("GPSImgDirectionRef")
-        .and_then(Value::as_str)
+    let altitude = exif.get_f64("GPSAltitude");
+    let image_direction = exif.get_f64("GPSImgDirection");
+    let image_direction_ref = exif
+        .get_str("GPSImgDirectionRef")
         .and_then(|s| match s {
             "T" => Some(DirectionRef::TrueNorth),
             "M" => Some(DirectionRef::MagneticNorth),
@@ -85,15 +82,15 @@ mod tests {
     async fn test_get_gps_info_with_full_data() {
         let geocoder = ReverseGeocoder::new();
         // Simulate numeric exif data with all relevant GPS tags
-        let numeric_exif = json!({
+        let exif = ExifData::new(json!({
             "GPSLatitude": 52.379_189,
             "GPSLongitude": 4.899_431,
             "GPSAltitude": 10.5,
             "GPSImgDirection": 123.45,
             "GPSImgDirectionRef": "T"
-        });
+        }));
 
-        let result = get_gps_info(&geocoder, &numeric_exif);
+        let result = get_gps_info(&geocoder, &exif);
 
         // 1. Assert that we got a result
         assert!(result.is_some(), "Should return Some for valid GPS data");
@@ -118,12 +115,12 @@ mod tests {
     async fn test_get_gps_info_with_minimal_data() {
         let geocoder = ReverseGeocoder::new();
         // Simulate numeric exif data with only the required tags
-        let numeric_exif = json!({
+        let exif = ExifData::new(json!({
             "GPSLatitude": 40.7128,
             "GPSLongitude": -74.0060
-        });
+        }));
 
-        let result = get_gps_info(&geocoder, &numeric_exif);
+        let result = get_gps_info(&geocoder, &exif);
 
         // 1. Assert that we still get a result
         assert!(result.is_some(), "Should return Some for minimal GPS data");
@@ -147,11 +144,11 @@ mod tests {
     async fn test_returns_none_if_latitude_is_missing() {
         let geocoder = ReverseGeocoder::new();
         // Longitude is present, but latitude is missing
-        let numeric_exif = json!({
+        let exif = ExifData::new(json!({
             "GPSLongitude": 4.899_431,
-        });
+        }));
 
-        let result = get_gps_info(&geocoder, &numeric_exif);
+        let result = get_gps_info(&geocoder, &exif);
         assert!(
             result.is_none(),
             "Should return None when GPSLatitude is missing"
@@ -162,11 +159,11 @@ mod tests {
     async fn test_returns_none_if_longitude_is_missing() {
         let geocoder = ReverseGeocoder::new();
         // Latitude is present, but longitude is missing
-        let numeric_exif = json!({
+        let exif = ExifData::new(json!({
             "GPSLatitude": 52.379_189,
-        });
+        }));
 
-        let result = get_gps_info(&geocoder, &numeric_exif);
+        let result = get_gps_info(&geocoder, &exif);
         assert!(
             result.is_none(),
             "Should return None when GPSLongitude is missing"
@@ -176,9 +173,9 @@ mod tests {
     #[tokio::test]
     async fn test_returns_none_for_empty_exif_data() {
         let geocoder = ReverseGeocoder::new();
-        let numeric_exif = json!({}); // Empty JSON object
+        let exif = ExifData::new(json!({})); // Empty JSON object
 
-        let result = get_gps_info(&geocoder, &numeric_exif);
+        let result = get_gps_info(&geocoder, &exif);
         assert!(result.is_none(), "Should return None for empty EXIF data");
     }
 }

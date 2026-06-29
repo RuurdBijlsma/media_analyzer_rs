@@ -1,12 +1,12 @@
+use crate::ExifData;
 use crate::tags::burst::find_burst_info;
 use crate::tags::fps::get_fps;
 use crate::tags::hdr::detect_hdr;
 use crate::tags::structs::MediaFeatures;
-use serde_json::Value;
 use std::path::Path;
 
 /// Extracts tags from a file's path and its EXIF metadata.
-pub fn extract_features(path: &Path, exif: &Value) -> MediaFeatures {
+pub fn extract_features(path: &Path, exif: &ExifData) -> MediaFeatures {
     let filename_lower = path
         .file_name()
         .unwrap_or_default()
@@ -21,19 +21,13 @@ pub fn extract_features(path: &Path, exif: &Value) -> MediaFeatures {
 
     // --- Tags from EXIF data ---
     let is_motion_photo = exif
-        .get("MotionPhoto")
-        .and_then(Value::as_i64)
+        .get_i64("MotionPhoto")
         .is_some_and(|x| x == 1);
 
-    let motion_photo_presentation_timestamp = exif
-        .get("MotionPhotoPresentationTimestampUs")
-        .and_then(Value::as_i64);
+    let motion_photo_presentation_timestamp = exif.get_i64("MotionPhotoPresentationTimestampUs");
 
     // --- Video Detection ---
-    let is_video = exif
-        .get("MIMEType")
-        .and_then(|m| m.as_str())
-        .is_some_and(|s| s.starts_with("video/"));
+    let is_video = exif.is_video();
 
     let is_hdr = detect_hdr(exif);
 
@@ -47,25 +41,21 @@ pub fn extract_features(path: &Path, exif: &Value) -> MediaFeatures {
     };
 
     let is_timelapse = exif
-        .get("UserComment")
-        .and_then(|c| c.as_str())
+        .get_str("UserComment")
         .map_or_else(
             || {
-                exif.get("Description")
-                    .and_then(|d| d.as_str())
-                    .map_or_else(
-                        || {
-                            // FIX APPLIED HERE: Replaced if let/else with map_or
-                            exif.get("SpecialTypeID").and_then(|s| s.as_str()).map_or(
-                                matches!(video_fps, Some(v_fps) if v_fps < 10.0),
-                                |special_type| special_type.to_lowercase().contains("timelapse"),
-                            )
-                        },
-                        |description| {
-                            let desc = description.to_lowercase();
-                            desc.contains("time-lapse") || desc.contains("hyperlapse")
-                        },
-                    )
+                exif.get_str("Description").map_or_else(
+                    || {
+                        exif.get_str("SpecialTypeID").map_or(
+                            matches!(video_fps, Some(v_fps) if v_fps < 10.0),
+                            |special_type| special_type.to_lowercase().contains("timelapse"),
+                        )
+                    },
+                    |description| {
+                        let desc = description.to_lowercase();
+                        desc.contains("time-lapse") || desc.contains("hyperlapse")
+                    },
+                )
             },
             |user_comment| {
                 let comment = user_comment.to_lowercase();
@@ -86,22 +76,17 @@ pub fn extract_features(path: &Path, exif: &Value) -> MediaFeatures {
         is_video,
         capture_fps,
         video_fps,
-        compressor_id: exif
-            .get("CompressorID")
-            .and_then(Value::as_str)
-            .map(str::to_owned),
-        audio_format: exif
-            .get("AudioFormat")
-            .and_then(Value::as_str)
-            .map(str::to_owned),
-        audio_channels: exif.get("AudioChannels").and_then(Value::as_u64),
-        audio_sample_rate: exif.get("AudioSampleRate").and_then(Value::as_u64),
+        compressor_id: exif.get_string("CompressorID"),
+        audio_format: exif.get_string("AudioFormat"),
+        audio_channels: exif.get_u64("AudioChannels"),
+        audio_sample_rate: exif.get_u64("AudioSampleRate"),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ExifData;
     use crate::MediaAnalyzerError;
     use exiftool::ExifTool;
     use std::path::Path;
@@ -115,9 +100,8 @@ mod tests {
 
         assert!(path.exists(), "Test asset file not found at: {path:?}");
 
-        // Use the numeric preset '-n' for all tests for consistency.
         let et = ExifTool::new()?;
-        let exif_data = et.json(&path, &["-n"])?;
+        let exif_data = ExifData::new(et.json(&path, &["-n", "-g2"])?);
 
         Ok(extract_features(&path, &exif_data))
     }
