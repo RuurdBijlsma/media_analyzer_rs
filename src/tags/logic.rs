@@ -20,9 +20,7 @@ pub fn extract_features(path: &Path, exif: &ExifData) -> MediaFeatures {
     let is_night_sight = filename_lower.contains("night");
 
     // --- Tags from EXIF data ---
-    let is_motion_photo = exif
-        .get_i64("MotionPhoto")
-        .is_some_and(|x| x == 1);
+    let is_motion_photo = exif.get_i64("MotionPhoto").is_some_and(|x| x == 1);
 
     let motion_photo_presentation_timestamp = exif.get_i64("MotionPhotoPresentationTimestampUs");
 
@@ -40,28 +38,26 @@ pub fn extract_features(path: &Path, exif: &ExifData) -> MediaFeatures {
         _ => false,
     };
 
-    let is_timelapse = exif
-        .get_str("UserComment")
-        .map_or_else(
-            || {
-                exif.get_str("Description").map_or_else(
-                    || {
-                        exif.get_str("SpecialTypeID").map_or(
-                            matches!(video_fps, Some(v_fps) if v_fps < 10.0),
-                            |special_type| special_type.to_lowercase().contains("timelapse"),
-                        )
-                    },
-                    |description| {
-                        let desc = description.to_lowercase();
-                        desc.contains("time-lapse") || desc.contains("hyperlapse")
-                    },
-                )
-            },
-            |user_comment| {
-                let comment = user_comment.to_lowercase();
-                comment.contains("time-lapse") || comment.contains("hyperlapse")
-            },
-        );
+    let is_timelapse = exif.get_str("UserComment").map_or_else(
+        || {
+            exif.get_str("Description").map_or_else(
+                || {
+                    exif.get_str("SpecialTypeID").map_or(
+                        matches!(video_fps, Some(v_fps) if v_fps < 10.0),
+                        |special_type| special_type.to_lowercase().contains("timelapse"),
+                    )
+                },
+                |description| {
+                    let desc = description.to_lowercase();
+                    desc.contains("time-lapse") || desc.contains("hyperlapse")
+                },
+            )
+        },
+        |user_comment| {
+            let comment = user_comment.to_lowercase();
+            comment.contains("time-lapse") || comment.contains("hyperlapse")
+        },
+    );
 
     // --- Construct and return the final struct ---
     MediaFeatures {

@@ -11,12 +11,14 @@ use std::ops::Deref;
 pub struct ExifData(Value);
 
 impl ExifData {
-    pub fn new(value: Value) -> Self {
+    #[must_use]
+    pub const fn new(value: Value) -> Self {
         Self(value)
     }
 
     /// Access the underlying JSON value.
-    pub fn inner(&self) -> &Value {
+    #[must_use]
+    pub const fn inner(&self) -> &Value {
         &self.0
     }
 
@@ -49,6 +51,7 @@ impl ExifData {
 
     // --- Flat accessors (for -n output) ---
 
+    #[must_use]
     pub fn get_f64(&self, key: &str) -> Option<f64> {
         let val = self.find_value(key)?;
         if let Some(n) = val.as_f64() {
@@ -77,15 +80,20 @@ impl ExifData {
         self.find_value(key).and_then(parse_bool)
     }
 
+    #[must_use]
     pub fn get_value(&self, key: &str) -> Option<&Value> {
         self.find_value(key)
     }
 
+    /// # Errors
+    /// * If field is missing or not u64
     pub fn require_u64(&self, key: &str) -> Result<u64, MetadataError> {
         self.get_u64(key)
             .ok_or_else(|| MetadataError::MissingRequiredField(key.to_string()))
     }
 
+    /// # Errors
+    /// * If field is or not a string
     pub fn require_string(&self, key: &str) -> Result<String, MetadataError> {
         self.get_string(key)
             .ok_or_else(|| MetadataError::MissingRequiredField(key.to_string()))
@@ -93,10 +101,12 @@ impl ExifData {
 
     // --- Grouped accessors (for -g2 output) ---
 
+    #[must_use]
     pub fn group_str(&self, group: &str, key: &str) -> Option<&str> {
         self.0.get(group)?.get(key)?.as_str()
     }
 
+    #[must_use]
     pub fn group_u32(&self, group: &str, key: &str) -> Option<u32> {
         self.0
             .get(group)?
@@ -108,6 +118,7 @@ impl ExifData {
     // --- Convenience ---
 
     /// Case-insensitive tag lookup with optional namespace prefix matching (e.g. `GPano:UsePanoramaViewer`).
+    #[must_use]
     pub fn get_ignoring_case(&self, tag_name: &str) -> Option<&Value> {
         let target = tag_name.to_lowercase();
         let root = self.0.as_object()?;
@@ -126,6 +137,7 @@ impl ExifData {
         None
     }
 
+    #[must_use]
     pub fn get_f64_ignoring_case(&self, tag_name: &str) -> Option<f64> {
         let val = self.get_ignoring_case(tag_name)?;
         if let Some(n) = val.as_f64() {
@@ -138,6 +150,7 @@ impl ExifData {
         self.get_ignoring_case(tag_name).and_then(parse_bool)
     }
 
+    #[must_use]
     pub fn is_video(&self) -> bool {
         self.group_str("Other", "MIMEType")
             .or_else(|| self.get_str("MIMEType"))

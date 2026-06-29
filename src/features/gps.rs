@@ -32,7 +32,8 @@ pub struct LocationName {
 }
 
 pub fn get_gps_info(geocoder: &ReverseGeocoder, exif: &ExifData) -> Option<GpsInfo> {
-    let (Some(latitude), Some(longitude)) = (exif.get_f64("GPSLatitude"), exif.get_f64("GPSLongitude"))
+    let (Some(latitude), Some(longitude)) =
+        (exif.get_f64("GPSLatitude"), exif.get_f64("GPSLongitude"))
     else {
         return None;
     };
@@ -41,13 +42,11 @@ pub fn get_gps_info(geocoder: &ReverseGeocoder, exif: &ExifData) -> Option<GpsIn
     }
     let altitude = exif.get_f64("GPSAltitude");
     let image_direction = exif.get_f64("GPSImgDirection");
-    let image_direction_ref = exif
-        .get_str("GPSImgDirectionRef")
-        .and_then(|s| match s {
-            "T" => Some(DirectionRef::TrueNorth),
-            "M" => Some(DirectionRef::MagneticNorth),
-            _ => None,
-        });
+    let image_direction_ref = exif.get_str("GPSImgDirectionRef").and_then(|s| match s {
+        "T" => Some(DirectionRef::TrueNorth),
+        "M" => Some(DirectionRef::MagneticNorth),
+        _ => None,
+    });
 
     let search_result = geocoder.search((latitude, longitude));
     let country_name = rust_iso3166::from_alpha2(&search_result.record.cc);

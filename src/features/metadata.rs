@@ -107,7 +107,9 @@ pub fn get_metadata(exif: &ExifData) -> Result<(BasicMetadata, CameraSettings), 
     let mut width = exif.require_u64("ImageWidth")?;
     let mut height = exif.require_u64("ImageHeight")?;
     let orientation = exif.get_u64("Orientation");
-    let is_video_rotated = exif.get_u64("Rotation").is_some_and(|r| r == 90 || r == 270);
+    let is_video_rotated = exif
+        .get_u64("Rotation")
+        .is_some_and(|r| r == 90 || r == 270);
     let is_photo_rotated = orientation.is_some_and(|o| (5..=8).contains(&o));
     if is_photo_rotated || is_video_rotated {
         // Swap width and height for 90 and 270-degree rotations

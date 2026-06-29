@@ -2,18 +2,12 @@ use crate::ExifData;
 
 pub fn detect_hdr(exif: &ExifData) -> bool {
     // 1. Pixel: CompositeImage == 3
-    if exif
-        .get_i64("CompositeImage")
-        .is_some_and(|x| x == 3)
-    {
+    if exif.get_i64("CompositeImage").is_some_and(|x| x == 3) {
         return true;
     }
 
     // 2. SceneCaptureType == 3 (some DSLRs / iPhones)
-    if exif
-        .get_i64("SceneCaptureType")
-        .is_some_and(|x| x == 3)
-    {
+    if exif.get_i64("SceneCaptureType").is_some_and(|x| x == 3) {
         return true;
     }
 

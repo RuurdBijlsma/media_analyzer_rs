@@ -1,10 +1,10 @@
 //! Functions for extracting raw time-related string/number values from EXIF JSON.
 
-use crate::ExifData;
 use super::parsing::{
     add_subseconds_from_number, parse_datetime_offset, parse_datetime_utc_z, parse_naive,
     parse_offset_string,
 };
+use crate::ExifData;
 use crate::time::filename_parsing::parse_datetime_from_filename;
 use chrono::{DateTime, FixedOffset, NaiveDateTime, Utc};
 

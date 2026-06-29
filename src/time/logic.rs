@@ -278,8 +278,9 @@ mod tests {
     }
 
     fn get_basic_exif() -> ExifData {
-        ExifData::new(from_str(
-            r#"{
+        ExifData::new(
+            from_str(
+                r#"{
         "Time": {
         "FileModifyDate": "2011:01:01 15:26:40+01:00",
         "ModifyDate": "2011:01:01 16:26:30",
@@ -287,8 +288,9 @@ mod tests {
         "CreateDate": "                    "
         }
         }"#,
+            )
+            .unwrap(),
         )
-        .unwrap())
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -394,7 +396,9 @@ mod tests {
 
     #[test]
     fn test_priority6_naive_only_low_confidence() {
-        let exif = ExifData::new(from_str(r#"{ "Time": { "DateTimeOriginal": "2023-05-10 10:00:00" } }"#).unwrap());
+        let exif = ExifData::new(
+            from_str(r#"{ "Time": { "DateTimeOriginal": "2023-05-10 10:00:00" } }"#).unwrap(),
+        );
         let info = get_time_info(&exif, None).unwrap();
 
         assert_eq!(
@@ -413,7 +417,9 @@ mod tests {
 
     #[test]
     fn test_priority7_utc_only_with_fallback_timezone() {
-        let exif = ExifData::new(from_str(r#"{ "Time": { "GPSDateTime": "2022-08-15T18:00:00Z" } }"#).unwrap());
+        let exif = ExifData::new(
+            from_str(r#"{ "Time": { "GPSDateTime": "2022-08-15T18:00:00Z" } }"#).unwrap(),
+        );
         let info = get_time_info(&exif, None).unwrap();
 
         // UTC time is known and accurate.
