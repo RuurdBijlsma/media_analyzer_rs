@@ -2,7 +2,7 @@ use crate::MediaAnalyzerError;
 use crate::features::gps::get_gps_info;
 use crate::features::hashing::hash_file;
 use crate::features::metadata::get_metadata;
-use crate::features::pano::get_pano_info;
+use crate::features::pano::should_use_pano_viewer;
 use crate::features::weather::get_weather_info;
 use crate::structs::MediaMetadata;
 use crate::tags::logic::extract_features;
@@ -165,7 +165,7 @@ impl MediaAnalyzer {
         let (basic, camera) = get_metadata(&numeric_exif)?;
         let features = extract_features(media_file, &numeric_exif);
         let gps = get_gps_info(&self.geocoder, &numeric_exif);
-        let panorama = get_pano_info(media_file, &numeric_exif);
+        let use_panorama_viewer = should_use_pano_viewer(&numeric_exif);
         let time = get_time_info(&exif_info, gps.as_ref())?;
 
         let weather = if let (Some(gps), Some(utc_time)) = (gps.as_ref(), time.datetime_utc) {
@@ -187,7 +187,7 @@ impl MediaAnalyzer {
             features,
             time,
             gps,
-            panorama,
+            use_panorama_viewer,
             basic,
             camera,
             weather,
@@ -221,7 +221,7 @@ mod tests {
         assert!(!result.features.is_hdr, "sunset.jpg is not hdr");
         assert!(result.gps.is_some(), "Should have GPS info");
         assert!(!result.features.is_burst);
-        assert!(!result.panorama.is_photosphere);
+        assert!(!result.use_panorama_viewer);
 
         Ok(())
     }
@@ -239,7 +239,7 @@ mod tests {
         assert!(result.features.is_hdr, "hdr.jpg is hdr");
         assert!(result.gps.is_some(), "Should have GPS info");
         assert!(!result.features.is_burst);
-        assert!(!result.panorama.is_photosphere);
+        assert!(!result.use_panorama_viewer);
 
         Ok(())
     }
@@ -258,7 +258,7 @@ mod tests {
         assert!(!result.features.is_hdr);
         assert!(result.gps.is_some(), "Should have GPS info");
         assert!(!result.features.is_burst);
-        assert!(!result.panorama.is_photosphere);
+        assert!(!result.use_panorama_viewer);
 
         Ok(())
     }
@@ -310,12 +310,7 @@ mod tests {
 
         let result = analyzer.analyze_media(&media_file).await?;
 
-        assert!(result.panorama.is_photosphere);
-        assert!(result.panorama.use_panorama_viewer);
-        assert_eq!(
-            result.panorama.projection_type,
-            Some("equirectangular".to_string())
-        );
+        assert!(result.use_panorama_viewer);
 
         Ok(())
     }

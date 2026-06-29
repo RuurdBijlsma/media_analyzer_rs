@@ -105,7 +105,6 @@ pub use error::MediaAnalyzerError;
 // The main result struct and its components
 pub use features::gps::{GpsInfo, LocationName};
 pub use features::metadata::{BasicMetadata, CameraSettings};
-pub use features::pano::{PanoInfo, PanoViewInfo};
 pub use features::weather::{SunInfo, WeatherInfo};
 pub use structs::MediaMetadata;
 pub use tags::structs::MediaFeatures;
