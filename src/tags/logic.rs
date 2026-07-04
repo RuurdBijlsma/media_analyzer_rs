@@ -123,10 +123,7 @@ mod tests {
     fn test_motion_photo() {
         let tags = get_tags_for_asset("motion/PXL_20250103_180944831.MP.jpg").unwrap();
 
-        assert!(
-            tags.is_motion_photo,
-            "Should be detected as a Motion Photo"
-        );
+        assert!(tags.is_motion_photo, "Should be detected as a Motion Photo");
         assert!(
             !tags.is_video,
             "Motion photos are not considered primary videos"

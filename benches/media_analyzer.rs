@@ -16,7 +16,7 @@ fn bench(c: &mut Criterion) {
     });
 
     let media_analyzer = rt.block_on(async { MediaAnalyzer::builder().build().await.unwrap() });
-    let image_path = Path::new("./assets/motion/PXL_20250103_180944831.MP.jpg");
+    let image_path = Path::new("./assets/tz-offset-bug/IMG_20170904_101507.jpg");
 
     c.bench_function("media_analyzer.analyze_media", |b| {
         b.iter(|| {

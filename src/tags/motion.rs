@@ -40,12 +40,10 @@ fn find_embedded_mp4_start(data: &[u8]) -> Option<usize> {
     let end = data.len() - 7;
     while i < end {
         // Find the next occurrence of b'f' first for high-performance scanning
-        if data[i] == b'f' {
-            if &data[i..i + 4] == b"ftyp" {
-                let brand = &data[i + 4..i + 8];
-                if brand.iter().all(|&b| b.is_ascii_alphanumeric()) && i >= 4 {
-                    return Some(i - 4);
-                }
+        if data[i] == b'f' && &data[i..i + 4] == b"ftyp" {
+            let brand = &data[i + 4..i + 8];
+            if brand.iter().all(|&b| b.is_ascii_alphanumeric()) && i >= 4 {
+                return Some(i - 4);
             }
         }
         i += 1;
@@ -55,77 +53,68 @@ fn find_embedded_mp4_start(data: &[u8]) -> Option<usize> {
 
 /// Determines if the file has an embedded motion photo video.
 pub fn detect_motion_photo(input_file: &Path, exif: &ExifData) -> bool {
-    // 1. Companion file check (extremely fast, OS-cached disk check)
     if check_companion_files(input_file) {
         return true;
     }
-
-    // 2. EXIF check for MotionPhotoVideo or EmbeddedVideoFile tags (memory-only lookup)
     if exif.get_ignoring_case("MotionPhotoVideo").is_some()
         || exif.get_ignoring_case("EmbeddedVideoFile").is_some()
     {
         return true;
     }
-
-    // 3. Legacy MicroVideoOffset check (seek-and-read of 64 bytes)
-    if let Some(offset_val) = exif.get_f64_ignoring_case("MicroVideoOffset") {
-        let offset_val = offset_val as u64;
-        if offset_val > 0 {
-            if let Ok(metadata) = std::fs::metadata(input_file) {
-                let file_size = metadata.len();
-                if file_size > offset_val {
-                    if let Ok(mut f) = File::open(input_file) {
-                        let start_offset = file_size - offset_val;
-                        if f.seek(SeekFrom::Start(start_offset)).is_ok() {
-                            let mut buf = [0u8; 64];
-                            if f.read_exact(&mut buf).is_ok() && is_valid_video(&buf, false) {
-                                return true;
-                            }
-                        }
-                    }
+    if let Some(offset_val) = exif.get_u64_ignoring_case("MicroVideoOffset")
+        && offset_val > 0
+        && let Ok(metadata) = std::fs::metadata(input_file)
+    {
+        let file_size = metadata.len();
+        if file_size > offset_val
+            && let Ok(mut f) = File::open(input_file)
+        {
+            let start_offset = file_size - offset_val;
+            if f.seek(SeekFrom::Start(start_offset)).is_ok() {
+                let mut buf = [0u8; 64];
+                if f.read_exact(&mut buf).is_ok() && is_valid_video(&buf, false) {
+                    return true;
                 }
             }
         }
     }
 
-    // 4. Quick check for standard JPEG EOI marker to avoid reading the whole file.
     // If a JPEG ends with 0xFF 0xD9 (End of Image) near the end, there is no appended MP4.
     let is_jpeg = input_file
         .extension()
         .and_then(|ext| ext.to_str())
-        .map_or(false, |ext| {
+        .is_some_and(|ext| {
             let ext_lower = ext.to_ascii_lowercase();
             ext_lower == "jpg" || ext_lower == "jpeg"
         });
 
     if is_jpeg {
-        if let Ok(mut f) = File::open(input_file) {
-            if let Ok(metadata) = f.metadata() {
-                let len = metadata.len();
-                if len > 128 {
-                    let mut last_bytes = vec![0u8; 128];
-                    if f.seek(SeekFrom::End(-128)).is_ok()
-                        && f.read_exact(&mut last_bytes).is_ok()
-                    {
-                        if let Some(pos) = last_bytes.windows(2).rposition(|w| w == [0xFF, 0xD9]) {
-                            // If EOI marker is within the last 32 bytes of the file,
-                            // there is definitely no trailing MP4 appended.
-                            if pos >= 96 {
-                                return false;
-                            }
-                        }
+        if let Ok(mut f) = File::open(input_file)
+            && let Ok(metadata) = f.metadata()
+        {
+            let len = metadata.len();
+            if len > 128 {
+                let mut last_bytes = vec![0u8; 128];
+                if f.seek(SeekFrom::End(-128)).is_ok()
+                    && f.read_exact(&mut last_bytes).is_ok()
+                    && let Some(pos) = last_bytes.windows(2).rposition(|w| w == [0xFF, 0xD9])
+                {
+                    // If EOI marker is within the last 32 bytes of the file,
+                    // there is definitely no trailing MP4 appended.
+                    if pos >= 96 {
+                        return false;
                     }
                 }
             }
         }
 
-        // 5. Carving fallback (only as a last resort for JPEGs)
-        if let Ok(data) = std::fs::read(input_file) {
-            if let Some(mp4_start_offset) = find_embedded_mp4_start(&data) {
-                let video_bytes = &data[mp4_start_offset..];
-                if is_valid_video(video_bytes, true) {
-                    return true;
-                }
+        // Fallback look for mp4
+        if let Ok(data) = std::fs::read(input_file)
+            && let Some(mp4_start_offset) = find_embedded_mp4_start(&data)
+        {
+            let video_bytes = &data[mp4_start_offset..];
+            if is_valid_video(video_bytes, true) {
+                return true;
             }
         }
     }

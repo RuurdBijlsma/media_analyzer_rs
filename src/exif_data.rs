@@ -1,3 +1,4 @@
+#![allow(clippy::cast_sign_loss)]
 use crate::features::error::MetadataError;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -144,6 +145,20 @@ impl ExifData {
             return Some(n);
         }
         val.as_str().and_then(|s| s.parse().ok())
+    }
+
+    #[must_use]
+    pub fn get_u64_ignoring_case(&self, tag_name: &str) -> Option<u64> {
+        let val = self.get_ignoring_case(tag_name)?;
+        if let Some(n) = val.as_u64() {
+            return Some(n);
+        }
+        if let Some(n) = val.as_f64() {
+            return Some(n as u64);
+        }
+        val.as_str().and_then(|s| {
+            s.parse::<u64>().ok().or_else(|| s.parse::<f64>().ok().map(|f| f as u64))
+        })
     }
 
     pub fn get_bool_ignoring_case(&self, tag_name: &str) -> Option<bool> {
