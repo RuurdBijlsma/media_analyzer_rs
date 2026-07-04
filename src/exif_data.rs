@@ -157,7 +157,9 @@ impl ExifData {
             return Some(n as u64);
         }
         val.as_str().and_then(|s| {
-            s.parse::<u64>().ok().or_else(|| s.parse::<f64>().ok().map(|f| f as u64))
+            s.parse::<u64>()
+                .ok()
+                .or_else(|| s.parse::<f64>().ok().map(|f| f as u64))
         })
     }
 
