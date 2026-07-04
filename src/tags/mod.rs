@@ -3,3 +3,4 @@ pub mod fps;
 pub mod hdr;
 pub mod logic;
 pub mod structs;
+pub mod motion;

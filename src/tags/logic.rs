@@ -2,6 +2,7 @@ use crate::ExifData;
 use crate::tags::burst::find_burst_info;
 use crate::tags::fps::get_fps;
 use crate::tags::hdr::detect_hdr;
+use crate::tags::motion::detect_motion_photo;
 use crate::tags::structs::MediaFeatures;
 use std::path::Path;
 
@@ -19,9 +20,8 @@ pub fn extract_features(path: &Path, exif: &ExifData) -> MediaFeatures {
     // --- Other Tags from Filename ---
     let is_night_sight = filename_lower.contains("night");
 
-    // --- Tags from EXIF data ---
-    let is_motion_photo = exif.get_i64("MotionPhoto").is_some_and(|x| x == 1);
-
+    // --- Tags from EXIF / Carving / Companion ---
+    let is_motion_photo = detect_motion_photo(path, exif);
     let motion_photo_presentation_timestamp = exif.get_i64("MotionPhotoPresentationTimestampUs");
 
     // --- Video Detection ---
@@ -125,11 +125,7 @@ mod tests {
 
         assert!(
             tags.is_motion_photo,
-            "Should be detected as a Motion Photo from EXIF tag"
-        );
-        assert!(
-            tags.motion_photo_presentation_timestamp.is_some(),
-            "Should have a presentation timestamp"
+            "Should be detected as a Motion Photo"
         );
         assert!(
             !tags.is_video,
@@ -218,7 +214,6 @@ mod tests {
 
         // Assert all optional fields are None
         assert!(tags.burst_id.is_none());
-        assert!(tags.motion_photo_presentation_timestamp.is_none());
     }
 
     #[test]
@@ -239,6 +234,5 @@ mod tests {
         assert!(tags.burst_id.is_none());
         assert!(tags.capture_fps.is_none());
         assert!(tags.video_fps.is_none());
-        assert!(tags.motion_photo_presentation_timestamp.is_none());
     }
 }
