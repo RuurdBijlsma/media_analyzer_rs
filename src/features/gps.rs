@@ -1,7 +1,6 @@
 use crate::ExifData;
 use reverse_geocoder::ReverseGeocoder;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum DirectionRef {
@@ -74,24 +73,19 @@ pub fn get_gps_info(geocoder: &ReverseGeocoder, exif: &ExifData) -> Option<GpsIn
 
 fn extract_altitude(exif: &ExifData) -> Option<f64> {
     // Try to get raw altitude and ref from the "GPS" group to avoid Composite/ExifTool bugs
-    if let Some(gps_group) = exif.inner().get("GPS")
-        && let Some(raw_alt_val) = gps_group.get("GPSAltitude")
-        && let Some(raw_alt) = value_to_f64(raw_alt_val)
-    {
+    if let Some(raw_alt) = exif.group_f64("GPS", "GPSAltitude") {
         let unsigned_alt = raw_alt.abs();
 
         // Strictly validate GPSAltitudeRef
-        let is_below_sea_level = gps_group.get("GPSAltitudeRef").is_some_and(|ref_val| {
-            ref_val.as_f64().map_or_else(
-                || {
-                    ref_val.as_str().is_some_and(|ref_str| {
-                        let ref_str_lower = ref_str.to_lowercase();
-                        ref_str_lower.contains("below") || ref_str_lower.contains("negative")
-                    })
-                },
-                |ref_num| (ref_num - 1.0).abs() < 1e-5 || (ref_num - 3.0).abs() < 1e-5,
-            )
-        });
+        let is_below_sea_level = exif.group_f64("GPS", "GPSAltitudeRef").map_or_else(
+            || {
+                exif.group_str("GPS", "GPSAltitudeRef").is_some_and(|ref_str| {
+                    let ref_str_lower = ref_str.to_lowercase();
+                    ref_str_lower.contains("below") || ref_str_lower.contains("negative")
+                })
+            },
+            |ref_num| (ref_num - 1.0).abs() < 1e-5 || (ref_num - 3.0).abs() < 1e-5,
+        );
 
         let alt = if is_below_sea_level {
             -unsigned_alt
@@ -101,21 +95,8 @@ fn extract_altitude(exif: &ExifData) -> Option<f64> {
         return Some(alt);
     }
 
-    // 2. Fall back to standard lookup if the "GPS" group or raw values are missing
+    // Fall back to standard lookup if the "GPS" group or raw values are missing
     exif.get_f64("GPSAltitude")
-}
-
-fn value_to_f64(val: &Value) -> Option<f64> {
-    if let Some(n) = val.as_f64() {
-        return Some(n);
-    }
-    if let Some(n) = val.as_i64() {
-        return Some(n as f64);
-    }
-    if let Some(n) = val.as_u64() {
-        return Some(n as f64);
-    }
-    val.as_str().and_then(|s| s.parse::<f64>().ok())
 }
 
 #[cfg(test)]
