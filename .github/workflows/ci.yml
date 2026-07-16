@@ -39,13 +39,13 @@ jobs:
           cargo clippy --all-features -- \
           -D warnings -W clippy::pedantic \
           -W clippy::nursery -W rust-2018-idioms \
-          -A clippy::single-match-else
+          -A clippy::single-match-else --locked
 
       - name: Build
-        run: cargo build --all-targets --all-features
+        run: cargo build --all-targets --all-features --locked
 
       - name: Run tests
-        run: cargo test -- --test-threads 1
+        run: cargo test -- --test-threads 1 --locked
 
       - name: Check documentation
-        run: cargo doc --no-deps --document-private-items
+        run: cargo doc --no-deps --document-private-items --locked
