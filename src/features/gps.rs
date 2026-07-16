@@ -1,6 +1,7 @@
 use crate::ExifData;
 use reverse_geocoder::ReverseGeocoder;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum DirectionRef {
@@ -40,7 +41,7 @@ pub fn get_gps_info(geocoder: &ReverseGeocoder, exif: &ExifData) -> Option<GpsIn
     if latitude == 0.0 && longitude == 0.0 {
         return None;
     }
-    let altitude = exif.get_f64("GPSAltitude");
+    let altitude = extract_altitude(exif);
     let image_direction = exif.get_f64("GPSImgDirection");
     let image_direction_ref = exif.get_str("GPSImgDirectionRef").and_then(|s| match s {
         "T" => Some(DirectionRef::TrueNorth),
@@ -69,6 +70,52 @@ pub fn get_gps_info(geocoder: &ReverseGeocoder, exif: &ExifData) -> Option<GpsIn
         image_direction,
         image_direction_ref,
     })
+}
+
+fn extract_altitude(exif: &ExifData) -> Option<f64> {
+    // Try to get raw altitude and ref from the "GPS" group to avoid Composite/ExifTool bugs
+    if let Some(gps_group) = exif.inner().get("GPS")
+        && let Some(raw_alt_val) = gps_group.get("GPSAltitude")
+        && let Some(raw_alt) = value_to_f64(raw_alt_val)
+    {
+        let unsigned_alt = raw_alt.abs();
+
+        // Strictly validate GPSAltitudeRef
+        let is_below_sea_level = gps_group.get("GPSAltitudeRef").is_some_and(|ref_val| {
+            ref_val.as_f64().map_or_else(
+                || {
+                    ref_val.as_str().is_some_and(|ref_str| {
+                        let ref_str_lower = ref_str.to_lowercase();
+                        ref_str_lower.contains("below") || ref_str_lower.contains("negative")
+                    })
+                },
+                |ref_num| (ref_num - 1.0).abs() < 1e-5 || (ref_num - 3.0).abs() < 1e-5,
+            )
+        });
+
+        let alt = if is_below_sea_level {
+            -unsigned_alt
+        } else {
+            unsigned_alt
+        };
+        return Some(alt);
+    }
+
+    // 2. Fall back to standard lookup if the "GPS" group or raw values are missing
+    exif.get_f64("GPSAltitude")
+}
+
+fn value_to_f64(val: &Value) -> Option<f64> {
+    if let Some(n) = val.as_f64() {
+        return Some(n);
+    }
+    if let Some(n) = val.as_i64() {
+        return Some(n as f64);
+    }
+    if let Some(n) = val.as_u64() {
+        return Some(n as f64);
+    }
+    val.as_str().and_then(|s| s.parse::<f64>().ok())
 }
 
 #[cfg(test)]
@@ -176,5 +223,55 @@ mod tests {
 
         let result = get_gps_info(&geocoder, &exif);
         assert!(result.is_none(), "Should return None for empty EXIF data");
+    }
+
+    #[tokio::test]
+    async fn test_gps_altitude_lg_g4_bug() {
+        let geocoder = ReverseGeocoder::new();
+        // Simulate the grouped structure returned by exiftool -n -g2
+        let exif = ExifData::new(json!({
+            "GPS": {
+                "GPSLatitude": 42.540,
+                "GPSLongitude": 1.7138,
+                "GPSAltitude": 2401,
+                "GPSAltitudeRef": 1.8
+            },
+            "Composite": {
+                "GPSLatitude": 42.540,
+                "GPSLongitude": 1.7138,
+                "GPSAltitude": -2401 // ExifTool incorrectly negated this
+            }
+        }));
+
+        let result = get_gps_info(&geocoder, &exif);
+        assert!(result.is_some());
+        let gps_info = result.unwrap();
+        // Altitude should remain positive (invalid 1.8 is ignored)
+        assert_eq!(gps_info.altitude, Some(2401.0));
+    }
+
+    #[tokio::test]
+    async fn test_gps_altitude_below_sea_level() {
+        let geocoder = ReverseGeocoder::new();
+        // Simulate the grouped structure for actual below-sea-level values
+        let exif = ExifData::new(json!({
+            "GPS": {
+                "GPSLatitude": 38.629,
+                "GPSLongitude": 20.610,
+                "GPSAltitude": 4,
+                "GPSAltitudeRef": 1
+            },
+            "Composite": {
+                "GPSLatitude": 38.629,
+                "GPSLongitude": 20.610,
+                "GPSAltitude": -4
+            }
+        }));
+
+        let result = get_gps_info(&geocoder, &exif);
+        assert!(result.is_some());
+        let gps_info = result.unwrap();
+        // Altitude should correctly remain negative
+        assert_eq!(gps_info.altitude, Some(-4.0));
     }
 }
