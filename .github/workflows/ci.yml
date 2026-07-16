@@ -39,7 +39,7 @@ jobs:
           cargo clippy --all-features -- \
           -D warnings -W clippy::pedantic \
           -W clippy::nursery -W rust-2018-idioms \
-          -A clippy::single-match-else --locked
+          -A clippy::single-match-else
 
       - name: Build
         run: cargo build --all-targets --all-features --locked
