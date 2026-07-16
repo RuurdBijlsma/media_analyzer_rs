@@ -116,6 +116,15 @@ impl ExifData {
             .and_then(|n| u32::try_from(n).ok())
     }
 
+    #[must_use]
+    pub fn group_f64(&self, group: &str, key: &str) -> Option<f64> {
+        let val = self.0.get(group)?.get(key)?;
+        if let Some(n) = val.as_f64() {
+            return Some(n);
+        }
+        val.as_str().and_then(|s| s.parse().ok())
+    }
+
     // --- Convenience ---
 
     /// Case-insensitive tag lookup with optional namespace prefix matching (e.g. `GPano:UsePanoramaViewer`).
@@ -234,13 +243,15 @@ mod tests {
     fn grouped_access() {
         let exif = ExifData::new(json!({
             "Time": { "DateTimeOriginal": "2024:01:01 10:00:00" },
-            "Other": { "FileName": "photo.jpg", "MIMEType": "video/mp4" }
+            "Other": { "FileName": "photo.jpg", "MIMEType": "video/mp4" },
+            "GPS": { "GPSAltitude": 2401.5 }
         }));
         assert_eq!(
             exif.group_str("Time", "DateTimeOriginal"),
             Some("2024:01:01 10:00:00")
         );
         assert_eq!(exif.group_str("Other", "FileName"), Some("photo.jpg"));
+        assert_eq!(exif.group_f64("GPS", "GPSAltitude"), Some(2401.5));
         assert!(exif.is_video());
     }
 

@@ -40,7 +40,7 @@ pub fn get_gps_info(geocoder: &ReverseGeocoder, exif: &ExifData) -> Option<GpsIn
     if latitude == 0.0 && longitude == 0.0 {
         return None;
     }
-    let altitude = exif.get_f64("GPSAltitude");
+    let altitude = extract_altitude(exif);
     let image_direction = exif.get_f64("GPSImgDirection");
     let image_direction_ref = exif.get_str("GPSImgDirectionRef").and_then(|s| match s {
         "T" => Some(DirectionRef::TrueNorth),
@@ -69,6 +69,37 @@ pub fn get_gps_info(geocoder: &ReverseGeocoder, exif: &ExifData) -> Option<GpsIn
         image_direction,
         image_direction_ref,
     })
+}
+
+fn extract_altitude(exif: &ExifData) -> Option<f64> {
+    let raw_alt = exif.group_f64("Location", "GPSAltitude");
+
+    if let Some(raw_alt) = raw_alt {
+        let unsigned_alt = raw_alt.abs();
+        let ref_num = exif.group_f64("Location", "GPSAltitudeRef");
+        let ref_str = exif.group_str("Location", "GPSAltitudeRef");
+
+        // Strictly validate GPSAltitudeRef
+        let is_below_sea_level = ref_num.map_or_else(
+            || {
+                ref_str.is_some_and(|ref_str| {
+                    let ref_str_lower = ref_str.to_lowercase();
+                    ref_str_lower.contains("below") || ref_str_lower.contains("negative")
+                })
+            },
+            |ref_num| (ref_num - 1.0).abs() < 1e-5 || (ref_num - 3.0).abs() < 1e-5,
+        );
+
+        let alt = if is_below_sea_level {
+            -unsigned_alt
+        } else {
+            unsigned_alt
+        };
+        return Some(alt);
+    }
+
+    // Fall back to standard composite lookup
+    exif.get_f64("GPSAltitude")
 }
 
 #[cfg(test)]
@@ -176,5 +207,55 @@ mod tests {
 
         let result = get_gps_info(&geocoder, &exif);
         assert!(result.is_none(), "Should return None for empty EXIF data");
+    }
+
+    #[tokio::test]
+    async fn test_gps_altitude_lg_g4_bug() {
+        let geocoder = ReverseGeocoder::new();
+        // Simulate the grouped structure returned by exiftool -n -g2
+        let exif = ExifData::new(json!({
+            "Location": {
+                "GPSLatitude": 42.540,
+                "GPSLongitude": 1.7138,
+                "GPSAltitude": 2401,
+                "GPSAltitudeRef": 1.8
+            },
+            "Composite": {
+                "GPSLatitude": 42.540,
+                "GPSLongitude": 1.7138,
+                "GPSAltitude": -2401 // ExifTool incorrectly negated this
+            }
+        }));
+
+        let result = get_gps_info(&geocoder, &exif);
+        assert!(result.is_some());
+        let gps_info = result.unwrap();
+        // Altitude should remain positive (invalid 1.8 is ignored)
+        assert_eq!(gps_info.altitude, Some(2401.0));
+    }
+
+    #[tokio::test]
+    async fn test_gps_altitude_below_sea_level() {
+        let geocoder = ReverseGeocoder::new();
+        // Simulate the grouped structure for actual below-sea-level values
+        let exif = ExifData::new(json!({
+            "Location": {
+                "GPSLatitude": 38.629,
+                "GPSLongitude": 20.610,
+                "GPSAltitude": 4,
+                "GPSAltitudeRef": 1
+            },
+            "Composite": {
+                "GPSLatitude": 38.629,
+                "GPSLongitude": 20.610,
+                "GPSAltitude": -4
+            }
+        }));
+
+        let result = get_gps_info(&geocoder, &exif);
+        assert!(result.is_some());
+        let gps_info = result.unwrap();
+        // Altitude should correctly remain negative
+        assert_eq!(gps_info.altitude, Some(-4.0));
     }
 }

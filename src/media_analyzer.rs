@@ -394,6 +394,27 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn test_gps_altitude() -> Result<(), MediaAnalyzerError> {
+        let analyzer = MediaAnalyzer::builder().build().await?;
+        let buggy_case = asset_path("gps_altitude/bad-altitude-ref.jpg");
+        let high_alt_1 = asset_path("gps_altitude/high-alt-2.jpg");
+        let high_alt_2 = asset_path("gps_altitude/high-altitude-1.jpg");
+        let neg_alt_correct = asset_path("gps_altitude/negative-alt-correct.jpg");
+
+        let buggy_case_result = analyzer.analyze_media(&buggy_case).await?;
+        let high_alt_1_result = analyzer.analyze_media(&high_alt_1).await?;
+        let high_alt_2_result = analyzer.analyze_media(&high_alt_2).await?;
+        let neg_alt_correcte_result = analyzer.analyze_media(&neg_alt_correct).await?;
+
+        dbg!(buggy_case_result.gps.unwrap().altitude);
+        dbg!(high_alt_1_result.gps.unwrap().altitude);
+        dbg!(high_alt_2_result.gps.unwrap().altitude);
+        dbg!(neg_alt_correcte_result.gps.unwrap().altitude);
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_analysis_fails_gracefully_for_non_media_file() -> Result<(), MediaAnalyzerError> {
         let analyzer = MediaAnalyzer::builder().build().await?;
         let media_file = asset_path("text_file.txt");
