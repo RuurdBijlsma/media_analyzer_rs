@@ -72,14 +72,17 @@ pub fn get_gps_info(geocoder: &ReverseGeocoder, exif: &ExifData) -> Option<GpsIn
 }
 
 fn extract_altitude(exif: &ExifData) -> Option<f64> {
-    // Try to get raw altitude and ref from the "GPS" group to avoid Composite/ExifTool bugs
-    if let Some(raw_alt) = exif.group_f64("GPS", "GPSAltitude") {
+    let raw_alt = exif.group_f64("Location", "GPSAltitude");
+
+    if let Some(raw_alt) = raw_alt {
         let unsigned_alt = raw_alt.abs();
+        let ref_num = exif.group_f64("Location", "GPSAltitudeRef");
+        let ref_str = exif.group_str("Location", "GPSAltitudeRef");
 
         // Strictly validate GPSAltitudeRef
-        let is_below_sea_level = exif.group_f64("GPS", "GPSAltitudeRef").map_or_else(
+        let is_below_sea_level = ref_num.map_or_else(
             || {
-                exif.group_str("GPS", "GPSAltitudeRef").is_some_and(|ref_str| {
+                ref_str.is_some_and(|ref_str| {
                     let ref_str_lower = ref_str.to_lowercase();
                     ref_str_lower.contains("below") || ref_str_lower.contains("negative")
                 })
@@ -95,7 +98,7 @@ fn extract_altitude(exif: &ExifData) -> Option<f64> {
         return Some(alt);
     }
 
-    // Fall back to standard lookup if the "GPS" group or raw values are missing
+    // Fall back to standard composite lookup
     exif.get_f64("GPSAltitude")
 }
 
@@ -211,7 +214,7 @@ mod tests {
         let geocoder = ReverseGeocoder::new();
         // Simulate the grouped structure returned by exiftool -n -g2
         let exif = ExifData::new(json!({
-            "GPS": {
+            "Location": {
                 "GPSLatitude": 42.540,
                 "GPSLongitude": 1.7138,
                 "GPSAltitude": 2401,
@@ -236,7 +239,7 @@ mod tests {
         let geocoder = ReverseGeocoder::new();
         // Simulate the grouped structure for actual below-sea-level values
         let exif = ExifData::new(json!({
-            "GPS": {
+            "Location": {
                 "GPSLatitude": 38.629,
                 "GPSLongitude": 20.610,
                 "GPSAltitude": 4,
