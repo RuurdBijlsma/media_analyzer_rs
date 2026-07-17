@@ -274,21 +274,32 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_motion_photo_is_correctly_identified() -> Result<(), MediaAnalyzerError> {
         let analyzer = MediaAnalyzer::builder().build().await?;
-        let media_file = asset_path("motion/PXL_20250103_180944831.MP.jpg");
+        let motion_file_1 = asset_path("motion/PXL_20250103_180944831.MP.jpg");
+        let motion_file_2 = asset_path("motion/PXL_20241226_135512167.MP.jpg");
+        let non_motion_pic = asset_path("tent.jpg");
+        let video_file = asset_path("video/get_rotated_idiot.mp4");
 
-        let result = analyzer.analyze_media(&media_file).await?;
+        let motion_file_1_result = analyzer.analyze_media(&motion_file_1).await?;
+        let motion_file_2_result = analyzer.analyze_media(&motion_file_2).await?;
+        let non_motion_pic_result = analyzer.analyze_media(&non_motion_pic).await?;
+        let video_file_result = analyzer.analyze_media(&video_file).await?;
 
         assert!(
-            !result.features.is_video,
+            !motion_file_1_result.features.is_video,
             "Motion Photo is not a primary video file"
         );
-        assert!(result.features.is_motion_photo);
+        assert!(motion_file_1_result.features.is_motion_photo);
         assert!(
-            result
+            motion_file_1_result
                 .features
                 .motion_photo_presentation_timestamp
                 .is_some()
         );
+
+        assert!(motion_file_2_result.features.is_motion_photo);
+        assert!(!non_motion_pic_result.features.is_motion_photo);
+        assert!(!video_file_result.features.is_motion_photo);
+        assert!(video_file_result.features.is_video);
 
         Ok(())
     }

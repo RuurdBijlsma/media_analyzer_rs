@@ -138,7 +138,10 @@ mod tests {
         assert_eq!(location.name, "Amsterdam");
         assert_eq!(location.admin1, "North Holland");
         assert_eq!(location.country_code, "NL");
-        assert_eq!(location.country_name, Some("Netherlands".to_string()));
+        assert_eq!(
+            location.country_name,
+            Some("Netherlands (Kingdom of the)".to_string())
+        );
     }
 
     #[tokio::test]

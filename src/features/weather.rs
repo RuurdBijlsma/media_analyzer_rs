@@ -150,7 +150,7 @@ mod tests {
     }
 
     /// This is an integration test that makes a real network call to the Meteostat API.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_get_weather_info_integration_success() {
         // 1. Setup
         let client = Meteostat::new()
