@@ -6,128 +6,73 @@
 [![Repository](https://img.shields.io/badge/GitHub-Repo-blue)](https://github.com/RuurdBijlsma/media_analyzer_rs)
 [![Build Status](https://github.com/RuurdBijlsma/media_analyzer_rs/actions/workflows/ci.yml/badge.svg)](https://github.com/RuurdBijlsma/media_analyzer_rs/actions/workflows/ci.yml)
 
-A Rust crate for extracting information from video and photo files.
+`media_analyzer` can extract structured metadata, resolved timestamps, timezone offsets, offline geolocation, and
+historical weather details from photo and video files.
 
-This crate provides a high-level, asynchronous API that acts as an orchestrator over tools like `exiftool`, combining
-raw metadata with intelligent parsing, geolocation, and historical weather data to produce a single, structured, and
-easy-to-use result.
-
-Example output, converted to JSON,
-viewable [here](https://github.com/RuurdBijlsma/media_analyzer_rs/blob/main/.github/example_output/example_output.json).
+---
 
 ## Prerequisites
 
-This crate requires an installation of **`exiftool`** to be available. If you don't want it in your PATH, you can pass
-the location of the executable in when building a `MediaAnalyzer`.
+This crate requires the [ExifTool](https://exiftool.org/) command-line utility. Ensure the executable is available in
+your system's `PATH`, or specify its path directly when configuring the analyzer.
 
-* **Official Website & Installation:** [https://exiftool.org/](https://exiftool.org/)
-* **macOS (Homebrew):** `brew install exiftool`
-* **Debian/Ubuntu:** `sudo apt install libimage-exiftool-perl`
-* **Windows:** Download the Windows Executable from the official website and ensure its location is in your PATH
-  environment variable.
-
-Verify your installation by typing `exiftool -ver` in your terminal.
+---
 
 ## Features
 
-* **Unified Metadata:** Gathers core properties (`FileMetadata`) and photographic details (`CaptureDetails`) from
-  media files.
-* **Time Resolution:** Analyzes multiple exif tags to determine the most accurate UTC timestamp and
-  timezone (`TimeInfo`).
-* **Geolocation & Weather:** Performs reverse geocoding on GPS coordinates (`GpsInfo`) and fetches historical
-  weather and sun data (`WeatherInfo`) from the time of capture.
-* **Rich Media Tagging:** Identifies special characteristics like `is_motion_photo`, `is_hdr`, `is_burst`, and
-  `is_slowmotion` (`TagData`).
+* **Unified Metadata**: Normalizes dimensions, format, duration, and orientation across photos and videos, alongside
+  camera details (such as ISO, aperture, exposure time, and lens model).
+* **Time & Timezone Resolution**: Evaluates EXIF tags, filesystem dates, and filename pattern fallbacks to resolve UTC
+  times, local times, and timezone offsets.
+* **Offline Geolocation**: Maps GPS coordinates to cities, regions, and countries without requiring a network
+  connection.
+* **Weather & Sun Alignment**: Retrieves historical weather data and calculates solar events (such as sunrise or sunset)
+  matching the time and place of capture.
+* **Smart Media Tagging**: Detects properties like HDR, motion photos, slow-motion capture rates, burst sequences, and
+  timelapses.
 
-## The `AnalyzeResult` Struct
+---
 
-The primary output of this crate is the `AnalyzeResult` struct. It is a single, consolidated container that holds all
-the information gathered during the analysis pipeline, making it easy to access any piece of data you need.
+## Usage Example
 
-## Installation
+Add `media_analyzer` to your `Cargo.toml`:
 
-Add `media_analyzer` to your `Cargo.toml` dependencies:
-
-```bash
-cargo add media_analyzer
+```toml
+[dependencies]
+media_analyzer = "0.10.3"
 ```
 
-## Quick Start
-
-Create a `MediaAnalyzer` instance using its builder, then call the `analyze_media` method.
-
 ```rust
+use std::path::Path;
 use media_analyzer::{MediaAnalyzer, MediaAnalyzerError};
 
 #[tokio::main]
 async fn main() -> Result<(), MediaAnalyzerError> {
-    // 1. Build the analyzer. The builder allows for custom configuration.
-    let analyzer = MediaAnalyzer::builder()
-        .weather_search_radius_km(75.0) // Optional: configure the analyzer
-        .build()
-        .await?;
-
-    // 2. Define the path to the photo or video file to analyze.
-    let media_file = Path::new("path/to/your/photo.jpg");
-
-    // 3. Analyze the photo, for a video you'd use analyze_media.
-    //    The thumbnail should be tiny, as it's meant to be a preview file 
-    //    that might be shown while the real image is loading. For example, at most 10x10 pixels.
-    let result = analyzer.analyze_media(media_file).await?;
-
-    // 4. Access the data from the `AnalyzeResult`.
-    if let Some(gps) = result.gps_info {
-        println!("Location: {}, {}", gps.location.name, gps.location.country_code);
-    }
-
-    if let Some(model) = result.capture_details.camera_model {
-        println!("Camera: {}", model);
-    }
-
-    if let Some(utc_time) = result.time_info.datetime_utc {
-        println!("Taken at (UTC): {}", utc_time);
-    }
-
-    if result.tags.is_hdr {
-        println!("This is an HDR image.");
-    }
-
+    let analyzer = MediaAnalyzer::builder().build().await?;
+    let result = analyzer.analyze_media(Path::new("assets/sunset.jpg")).await?;
+    println!("{}", serde_json::to_string_pretty(&result).unwrap());
+    // `result` is of type: `MediaMetadata`
     Ok(())
 }
 ```
 
-## Error Handling
+For a view of the output returned by the analyzer, see
+the [example output JSON](.github/example_output/example_output.json).
 
-All potentially failing operations return `Result<_, MediaAnalyzerError>`. The `MediaAnalyzerError` enum covers
-critical failures in the analysis pipeline, including:
+---
 
-* `Exiftool`: The `exiftool` process failed to execute or read the file.
-* `Metadata`: The media file was missing essential tags required for analysis (e.g., `ImageWidth`).
-* `Time`: No usable time or date information could be extracted from any source.
-* `DataUrl`: The provided thumbnail path was invalid or not a supported image format.
-* `Weather`: The external weather API call failed.
-* And others for I/O and initialization issues.
+## Custom ExifTool Binary
 
-## Core Dependencies
+If ExifTool is installed outside your system `PATH`, you can specify its executable path directly during setup:
 
-This crate is a high-level orchestrator that builds upon several powerful tools and libraries:
+```rust
+use std::path::Path;
+use media_analyzer::MediaAnalyzer;
 
-* **[ExifTool](https://exiftool.org/)**: The definitive tool for reading and writing media metadata.
-* **[exiftool_rs](https://crates.io/crates/exiftool)**: For persistent communication with the `exiftool` process.
-* **[meteostat_rs](https://crates.io/crates/meteostat)**: For fetching historical weather and climate data.
-* **[reverse_geocoder](https://crates.io/crates/reverse_geocoder)**: For offline reverse geocoding.
-* **[Chrono](https://crates.io/crates/chrono)** & **[Chrono-tz](https://crates.io/crates/chrono-tz)**: For time and
-  timezone handling.
-
-## API Documentation
-
-Full API documentation is available on [docs.rs](https://docs.rs/media_analyzer).
-
-## Contributing
-
-Contributions, bug reports, and feature requests are welcome! Please open an issue or submit a pull request on
-the [GitHub repository](https://github.com/RuurdBijlsma/media_analyzer_rs).
-
-## License
-
-This crate is licensed under the Apache License 2.0. See the `LICENSE.md` file for details.
+async fn init_custom() -> Result<MediaAnalyzer, media_analyzer::MediaAnalyzerError> {
+    MediaAnalyzer::builder()
+        .exiftool_path(Some(Path::new("/custom/path/to/exiftool")))
+        .build()
+        .await
+}
+```
