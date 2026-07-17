@@ -34,7 +34,7 @@ reverse_geocoder = "4.1.1"
 rust_iso3166 = "0.2.0"
 thiserror = { version = "2.0.18", default-features = false }
 blake3 = { version = "1.8.5", features = ["mmap", "rayon"] }
-meteostat = "0.4.6"
+meteostat = "0.4.7"
 sunrise = "3.0.0"
 
 [dev-dependencies]
