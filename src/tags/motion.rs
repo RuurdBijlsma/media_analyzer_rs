@@ -5,8 +5,20 @@ use std::path::Path;
 
 /// Checks if a companion file exists (e.g. .mov, .MOV, .mp4, .MP4).
 fn check_companion_files(input_file: &Path) -> bool {
+    let input_ext = input_file
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(str::to_lowercase);
+
     let companion_extensions = ["mov", "MOV", "mp4", "MP4"];
     for ext in &companion_extensions {
+        // Skip checking if the companion extension matches the current file's extension case-insensitively.
+        if let Some(ref iext) = input_ext
+            && iext == &ext.to_lowercase()
+        {
+            continue;
+        }
+
         let companion_path = input_file.with_extension(ext);
         if companion_path.exists() && companion_path.is_file() {
             return true;
@@ -53,6 +65,9 @@ fn find_embedded_mp4_start(data: &[u8]) -> Option<usize> {
 
 /// Determines if the file has an embedded motion photo video.
 pub fn detect_motion_photo(input_file: &Path, exif: &ExifData) -> bool {
+    if exif.is_video() {
+        return false;
+    }
     if check_companion_files(input_file) {
         return true;
     }
