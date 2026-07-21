@@ -146,10 +146,7 @@ mod tests {
         assert_eq!(location.name, "Amsterdam");
         assert_eq!(location.admin1, "North Holland");
         assert_eq!(location.country_code, "NL");
-        assert_eq!(
-            location.country_name,
-            Some("The Netherlands".to_string())
-        );
+        assert_eq!(location.country_name, Some("The Netherlands".to_string()));
     }
 
     #[tokio::test]
@@ -162,14 +159,20 @@ mod tests {
         }));
 
         let result = get_gps_info(&geocoder, &exif);
-        assert!(result.is_some(), "Should return Some for Netherlands coordinates");
+        assert!(
+            result.is_some(),
+            "Should return Some for Netherlands coordinates"
+        );
         dbg!(&result);
 
         let gps_info = result.unwrap();
         // Ensure the geocoded region is indeed the Netherlands (NL)
         assert_eq!(gps_info.location.country_code, "NL");
         // Verify that country name is normalized correctly
-        assert_eq!(gps_info.location.country_name, Some("The Netherlands".to_string()));
+        assert_eq!(
+            gps_info.location.country_name,
+            Some("The Netherlands".to_string())
+        );
     }
 
     #[tokio::test]
