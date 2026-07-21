@@ -49,16 +49,17 @@ pub fn get_gps_info(geocoder: &ReverseGeocoder, exif: &ExifData) -> Option<GpsIn
     });
 
     let search_result = geocoder.search((latitude, longitude));
-    let country_name = rust_iso3166::from_alpha2(&search_result.record.cc);
+    let country_info = rust_iso3166::from_alpha2(&search_result.record.cc);
+    let country_name = country_info.map(|a| a.name.strip_suffix(" (Kingdom of the)").unwrap_or(a.name)).map(|a| a.to_string());
     let record = search_result.record;
     let location = LocationName {
-        latitude: search_result.record.lat,
-        longitude: search_result.record.lon,
+        latitude: record.lat,
+        longitude: record.lon,
         name: record.name.clone(),
         admin1: record.admin1.clone(),
         admin2: record.admin2.clone(),
         country_code: record.cc.clone(),
-        country_name: country_name.map(|a| a.name.to_string()),
+        country_name,
     };
 
     Some(GpsInfo {
