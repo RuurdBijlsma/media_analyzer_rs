@@ -50,7 +50,9 @@ pub fn get_gps_info(geocoder: &ReverseGeocoder, exif: &ExifData) -> Option<GpsIn
 
     let search_result = geocoder.search((latitude, longitude));
     let country_info = rust_iso3166::from_alpha2(&search_result.record.cc);
-    let country_name = country_info.map(|a| a.name.strip_suffix(" (Kingdom of the)").unwrap_or(a.name)).map(|a| a.to_string());
+    let country_name = country_info
+        .map(|a| a.name.strip_suffix(" (Kingdom of the)").unwrap_or(a.name))
+        .map(ToString::to_string);
     let record = search_result.record;
     let location = LocationName {
         latitude: record.lat,
@@ -141,8 +143,28 @@ mod tests {
         assert_eq!(location.country_code, "NL");
         assert_eq!(
             location.country_name,
-            Some("Netherlands (Kingdom of the)".to_string())
+            Some("Netherlands".to_string())
         );
+    }
+
+    #[tokio::test]
+    async fn test_netherlands_country_name_normalization() {
+        let geocoder = ReverseGeocoder::new();
+        // Coordinates for Leerdam, Netherlands
+        let exif = ExifData::new(json!({
+            "GPSLatitude": 51.8938,
+            "GPSLongitude": 5.0918
+        }));
+
+        let result = get_gps_info(&geocoder, &exif);
+        assert!(result.is_some(), "Should return Some for Netherlands coordinates");
+        dbg!(&result);
+
+        let gps_info = result.unwrap();
+        // Ensure the geocoded region is indeed the Netherlands (NL)
+        assert_eq!(gps_info.location.country_code, "NL");
+        // Verify that " (Kingdom of the)" was stripped correctly
+        assert_eq!(gps_info.location.country_name, Some("Netherlands".to_string()));
     }
 
     #[tokio::test]
