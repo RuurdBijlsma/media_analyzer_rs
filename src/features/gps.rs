@@ -49,16 +49,17 @@ pub fn get_gps_info(geocoder: &ReverseGeocoder, exif: &ExifData) -> Option<GpsIn
     });
 
     let search_result = geocoder.search((latitude, longitude));
-    let country_name = rust_iso3166::from_alpha2(&search_result.record.cc);
+    let country_info = rust_iso3166::from_alpha2(&search_result.record.cc);
+    let country_name = country_info.map(|a| normalize_country_name(a.name));
     let record = search_result.record;
     let location = LocationName {
-        latitude: search_result.record.lat,
-        longitude: search_result.record.lon,
+        latitude: record.lat,
+        longitude: record.lon,
         name: record.name.clone(),
         admin1: record.admin1.clone(),
         admin2: record.admin2.clone(),
         country_code: record.cc.clone(),
-        country_name: country_name.map(|a| a.name.to_string()),
+        country_name,
     };
 
     Some(GpsInfo {
@@ -69,6 +70,13 @@ pub fn get_gps_info(geocoder: &ReverseGeocoder, exif: &ExifData) -> Option<GpsIn
         image_direction,
         image_direction_ref,
     })
+}
+
+fn normalize_country_name(name: &str) -> String {
+    match name {
+        "Netherlands (Kingdom of the)" => "The Netherlands".to_string(),
+        other => other.to_string(),
+    }
 }
 
 fn extract_altitude(exif: &ExifData) -> Option<f64> {
@@ -138,9 +146,32 @@ mod tests {
         assert_eq!(location.name, "Amsterdam");
         assert_eq!(location.admin1, "North Holland");
         assert_eq!(location.country_code, "NL");
+        assert_eq!(location.country_name, Some("The Netherlands".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_netherlands_country_name_normalization() {
+        let geocoder = ReverseGeocoder::new();
+        // Coordinates for Leerdam, Netherlands
+        let exif = ExifData::new(json!({
+            "GPSLatitude": 51.8938,
+            "GPSLongitude": 5.0918
+        }));
+
+        let result = get_gps_info(&geocoder, &exif);
+        assert!(
+            result.is_some(),
+            "Should return Some for Netherlands coordinates"
+        );
+        dbg!(&result);
+
+        let gps_info = result.unwrap();
+        // Ensure the geocoded region is indeed the Netherlands (NL)
+        assert_eq!(gps_info.location.country_code, "NL");
+        // Verify that country name is normalized correctly
         assert_eq!(
-            location.country_name,
-            Some("Netherlands (Kingdom of the)".to_string())
+            gps_info.location.country_name,
+            Some("The Netherlands".to_string())
         );
     }
 
