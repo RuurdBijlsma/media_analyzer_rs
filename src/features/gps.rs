@@ -50,9 +50,7 @@ pub fn get_gps_info(geocoder: &ReverseGeocoder, exif: &ExifData) -> Option<GpsIn
 
     let search_result = geocoder.search((latitude, longitude));
     let country_info = rust_iso3166::from_alpha2(&search_result.record.cc);
-    let country_name = country_info
-        .map(|a| a.name.strip_suffix(" (Kingdom of the)").unwrap_or(a.name))
-        .map(ToString::to_string);
+    let country_name = country_info.map(|a| normalize_country_name(a.name));
     let record = search_result.record;
     let location = LocationName {
         latitude: record.lat,
@@ -72,6 +70,13 @@ pub fn get_gps_info(geocoder: &ReverseGeocoder, exif: &ExifData) -> Option<GpsIn
         image_direction,
         image_direction_ref,
     })
+}
+
+fn normalize_country_name(name: &str) -> String {
+    match name {
+        "Netherlands (Kingdom of the)" => "The Netherlands".to_string(),
+        other => other.to_string(),
+    }
 }
 
 fn extract_altitude(exif: &ExifData) -> Option<f64> {
@@ -143,7 +148,7 @@ mod tests {
         assert_eq!(location.country_code, "NL");
         assert_eq!(
             location.country_name,
-            Some("Netherlands".to_string())
+            Some("The Netherlands".to_string())
         );
     }
 
@@ -163,8 +168,8 @@ mod tests {
         let gps_info = result.unwrap();
         // Ensure the geocoded region is indeed the Netherlands (NL)
         assert_eq!(gps_info.location.country_code, "NL");
-        // Verify that " (Kingdom of the)" was stripped correctly
-        assert_eq!(gps_info.location.country_name, Some("Netherlands".to_string()));
+        // Verify that country name is normalized correctly
+        assert_eq!(gps_info.location.country_name, Some("The Netherlands".to_string()));
     }
 
     #[tokio::test]
