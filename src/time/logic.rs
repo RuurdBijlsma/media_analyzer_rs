@@ -38,7 +38,47 @@ fn apply_priority_logic(
         is_video,
     } = components;
 
-    // --- Priority 1: Confirmed UTC (Highest confidence) ---
+    // --- Priority 1: Naive + Explicit Offset Tag (Highest confidence) ---
+    // An offset tag is an explicit statement about the timezone, so it outranks a timezone derived
+    // from GPS coordinates. When GPS agrees on the offset, its IANA name is kept for display.
+    if let (Some((local_dt, naive_source)), Some((offset_secs, offset_str, offset_source))) =
+        (&best_local, &potential_explicit_offset)
+        && let Some(offset) = FixedOffset::east_opt(*offset_secs)
+        && let LocalResult::Single(dt_with_offset) | LocalResult::Ambiguous(dt_with_offset, _) =
+            offset.from_local_datetime(local_dt)
+    {
+        let matching_gps_tz = gps_info
+            .and_then(|gps| Tz::from_str(FINDER.get_tz_name(gps.longitude, gps.latitude)).ok())
+            .filter(|tz| {
+                tz.offset_from_utc_datetime(&dt_with_offset.naive_utc())
+                    .fix()
+                    .local_minus_utc()
+                    == *offset_secs
+            });
+        let timezone = matching_gps_tz.map_or_else(
+            || TimeZoneInfo {
+                name: offset_str.clone(),
+                offset_seconds: *offset_secs,
+                source: offset_source.clone(),
+            },
+            |tz| TimeZoneInfo {
+                name: tz.name().to_string(),
+                offset_seconds: *offset_secs,
+                source: format!("{offset_source} confirmed by GPS"),
+            },
+        );
+        return Some(TimeInfo {
+            datetime_utc: Some(dt_with_offset.with_timezone(&Utc)),
+            datetime_local: *local_dt,
+            timezone: Some(timezone),
+            source_details: SourceDetails {
+                time_source: naive_source.clone(),
+                confidence: CONFIDENCE_HIGH.to_string(),
+            },
+        });
+    }
+
+    // --- Priority 2: Confirmed UTC (Highest confidence) ---
     if let (Some((local_dt, naive_source)), Some((gps_utc_dt, utc_source)), Some(gps)) =
         (&best_local, &potential_utc, gps_info)
         && let Ok(tz) = Tz::from_str(FINDER.get_tz_name(gps.longitude, gps.latitude))
@@ -76,7 +116,7 @@ fn apply_priority_logic(
     }
 
     if let Some((local_dt, naive_source)) = best_local {
-        // --- Priority 2: Zoned Time (Naive + GPS Location) ---
+        // --- Priority 3: Zoned Time (Naive + GPS Location) ---
         if let Some(gps) = gps_info
             && let Ok(tz) = Tz::from_str(FINDER.get_tz_name(gps.longitude, gps.latitude))
             && let LocalResult::Single(zoned_dt) | LocalResult::Ambiguous(zoned_dt, _) =
@@ -89,27 +129,6 @@ fn apply_priority_logic(
                     name: tz.name().to_string(),
                     offset_seconds: zoned_dt.offset().fix().local_minus_utc(),
                     source: "IANA from GPS".to_string(),
-                }),
-                source_details: SourceDetails {
-                    time_source: naive_source,
-                    confidence: CONFIDENCE_HIGH.to_string(),
-                },
-            });
-        }
-
-        // --- Priority 3: Fixed Offset Time (Naive + Explicit Offset Tag) ---
-        if let Some((offset_secs, offset_str, offset_source)) = potential_explicit_offset
-            && let Some(offset) = FixedOffset::east_opt(offset_secs)
-            && let LocalResult::Single(dt_with_offset) | LocalResult::Ambiguous(dt_with_offset, _) =
-                offset.from_local_datetime(&local_dt)
-        {
-            return Some(TimeInfo {
-                datetime_utc: Some(dt_with_offset.with_timezone(&Utc)),
-                datetime_local: local_dt,
-                timezone: Some(TimeZoneInfo {
-                    name: offset_str,
-                    offset_seconds: offset_secs,
-                    source: offset_source,
                 }),
                 source_details: SourceDetails {
                     time_source: naive_source,
@@ -435,5 +454,96 @@ mod tests {
                 .and_hms_opt(18, 0, 0)
                 .unwrap()
         );
+    }
+
+    #[test]
+    fn test_explicit_offset_outranks_gps() {
+        // Taken in Athens (GPS -> Europe/Athens, +03:00 in June), but the file states +09:00.
+        // GPS time (07:30Z) confirms the Athens offset, yet the explicit offset must still win.
+        let exif = ExifData::new(
+            from_str(
+                r#"{
+                "Time": {
+                    "DateTimeOriginal": "2024:06:15 10:30:00",
+                    "OffsetTimeOriginal": "+09:00",
+                    "GPSDateTime": "2024:06:15 07:30:00Z"
+                }
+            }"#,
+            )
+            .unwrap(),
+        );
+        let gps = MockGpsInfo {
+            latitude: 37.983_8,
+            longitude: 23.727_5,
+        };
+
+        let info = get_time_info(&exif, Some(&gps.into())).unwrap();
+
+        let timezone = info.timezone.unwrap();
+        assert_eq!(timezone.offset_seconds, 9 * 3600);
+        assert_eq!(timezone.name, "+09:00");
+        assert_eq!(
+            info.datetime_utc.unwrap().to_rfc3339(),
+            "2024-06-15T01:30:00+00:00"
+        );
+    }
+
+    #[test]
+    fn test_explicit_offset_keeps_gps_name_when_offsets_agree() {
+        let exif = ExifData::new(
+            from_str(
+                r#"{
+                "Time": {
+                    "DateTimeOriginal": "2024:06:15 10:30:00",
+                    "OffsetTimeOriginal": "+03:00"
+                }
+            }"#,
+            )
+            .unwrap(),
+        );
+        let gps = MockGpsInfo {
+            latitude: 37.983_8,
+            longitude: 23.727_5,
+        };
+
+        let info = get_time_info(&exif, Some(&gps.into())).unwrap();
+
+        let timezone = info.timezone.unwrap();
+        assert_eq!(timezone.name, "Europe/Athens");
+        assert_eq!(timezone.offset_seconds, 3 * 3600);
+        assert!(timezone.source.contains("confirmed by GPS"));
+    }
+
+    #[test]
+    fn test_video_creation_date_offset_is_used() {
+        let exif = ExifData::new(
+            from_str(
+                r#"{
+                "Other": { "MIMEType": "video/mp4" },
+                "Time": {
+                    "CreateDate": "2024:06:15 10:30:00",
+                    "CreationDate": "2024:06:15 12:30:00+02:00"
+                }
+            }"#,
+            )
+            .unwrap(),
+        );
+
+        let info = get_time_info(&exif, None).unwrap();
+
+        assert_eq!(
+            info.datetime_utc.unwrap().to_rfc3339(),
+            "2024-06-15T10:30:00+00:00"
+        );
+        assert_eq!(
+            info.datetime_local,
+            NaiveDate::from_ymd_opt(2024, 6, 15)
+                .unwrap()
+                .and_hms_opt(12, 30, 0)
+                .unwrap()
+        );
+        let timezone = info.timezone.unwrap();
+        assert_eq!(timezone.name, "+02:00");
+        assert_eq!(timezone.offset_seconds, 7200);
     }
 }

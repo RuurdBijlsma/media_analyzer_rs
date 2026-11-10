@@ -35,6 +35,15 @@ pub fn extract_time_components(exif: &ExifData) -> ExtractedTimeComponents {
     let mime = exif.group_str("Other", "MIMEType").unwrap_or("");
     let is_video = mime.contains("video");
 
+    // `Keys:CreationDate` (family 2 group `Time`) is the only video tag carrying a local wall time
+    // plus an explicit offset, so it supplies both the video's local time and its timezone.
+    let video_creation_dt = if is_video {
+        exif.group_str("Time", "CreationDate")
+            .and_then(parse_datetime_offset)
+    } else {
+        None
+    };
+
     // --- Best Naive Time (DateTimeOriginal, CreateDate, etc.) with SubSeconds ---
     // Video CreateDate is UTC, not local time. We exclude it from local sources for videos.
     let local_datetime_sources_priority = if is_video {
@@ -108,6 +117,12 @@ pub fn extract_time_components(exif: &ExifData) -> ExtractedTimeComponents {
         }
     }
 
+    if let Some(creation_dt) = &video_creation_dt
+        && primary_naive_candidate.is_none()
+    {
+        primary_naive_candidate = Some((creation_dt.naive_local(), "CreationDate".to_string()));
+    }
+
     if let (Some((local_dt, source_name)), Some((subsec_source, subsec_num))) = (
         primary_naive_candidate.as_mut(),
         found_subsecond_number_source.as_ref(),
@@ -153,6 +168,18 @@ pub fn extract_time_components(exif: &ExifData) -> ExtractedTimeComponents {
             potential_explicit_offset = Some((secs, parsed_str, field.to_string()));
             break;
         }
+    }
+
+    // Videos carry their offset in `Keys:CreationDate` instead of the `OffsetTime*` tags.
+    if let Some(creation_dt) = &video_creation_dt
+        && potential_explicit_offset.is_none()
+    {
+        let offset = creation_dt.offset();
+        potential_explicit_offset = Some((
+            offset.local_minus_utc(),
+            offset.to_string(),
+            "CreationDate".to_string(),
+        ));
     }
 
     // --- Potential UTC from Video Tags ---
@@ -454,5 +481,38 @@ mod tests {
             "19:28:01",
             "CreateDate should not have been used as local time for a video"
         );
+    }
+
+    #[test]
+    fn test_video_creation_date_gives_local_time_and_offset() {
+        let exif = ExifData::new(json!({
+            "Other": {
+                "MIMEType": "video/mp4",
+                "FileName": "PXL_20240101_090000000.mp4"
+            },
+            "Time": {
+                "CreateDate": "2024:06:15 10:30:00",
+                "CreationDate": "2024:06:15 12:30:00+02:00"
+            },
+        }));
+
+        let components = extract_time_components(&exif);
+
+        // `Keys:CreationDate` is local time with an offset, so it beats the UTC CreateDate and the
+        // filename.
+        let (local_dt, local_source) = components.best_local.unwrap();
+        assert_eq!(local_source, "CreationDate");
+        assert_eq!(
+            local_dt,
+            NaiveDate::from_ymd_opt(2024, 6, 15)
+                .unwrap()
+                .and_hms_opt(12, 30, 0)
+                .unwrap()
+        );
+
+        let (secs, offset_str, offset_source) = components.potential_explicit_offset.unwrap();
+        assert_eq!(secs, 2 * 3600);
+        assert_eq!(offset_str, "+02:00");
+        assert_eq!(offset_source, "CreationDate");
     }
 }
