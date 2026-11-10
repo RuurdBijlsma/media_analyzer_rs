@@ -459,12 +459,14 @@ mod tests {
     #[test]
     fn test_explicit_offset_outranks_gps() {
         // Taken in Athens (GPS -> Europe/Athens, +03:00 in June), but the file states +09:00.
+        // GPS time (07:30Z) confirms the Athens offset, yet the explicit offset must still win.
         let exif = ExifData::new(
             from_str(
                 r#"{
                 "Time": {
                     "DateTimeOriginal": "2024:06:15 10:30:00",
-                    "OffsetTimeOriginal": "+09:00"
+                    "OffsetTimeOriginal": "+09:00",
+                    "GPSDateTime": "2024:06:15 07:30:00Z"
                 }
             }"#,
             )

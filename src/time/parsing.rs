@@ -27,7 +27,8 @@ pub fn parse_naive(s: &str) -> Option<(NaiveDateTime, bool)> {
 
 /// Parses a datetime string with a timezone offset (e.g., file modification date).
 pub fn parse_datetime_offset(s: &str) -> Option<DateTime<FixedOffset>> {
-    DateTime::parse_from_str(s, "%Y:%m:%d %H:%M:%S%z")
+    // `%.f` also accepts values without a fractional part, so this covers both forms.
+    DateTime::parse_from_str(s, "%Y:%m:%d %H:%M:%S%.f%z")
         .ok()
         .or_else(|| DateTime::parse_from_rfc3339(s).ok())
 }
@@ -158,6 +159,14 @@ mod tests {
         fn parses_rfc3339_fallback() {
             let dt = parse_datetime_offset("2024-09-09T14:30:00-05:00").unwrap();
             assert_eq!(dt.to_rfc3339(), "2024-09-09T14:30:00-05:00");
+        }
+
+        #[test]
+        fn parses_exif_offset_with_fractional_seconds() {
+            // QuickTime `Keys:CreationDate` can include subseconds.
+            let dt = parse_datetime_offset("2024:08:08 10:00:00.500+02:00").unwrap();
+            assert_eq!(dt.timestamp_subsec_millis(), 500);
+            assert_eq!(dt.offset().local_minus_utc(), 2 * 3600);
         }
 
         #[test]
